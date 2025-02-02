@@ -29,7 +29,7 @@ COPY --from=builder /app /app
 COPY .env /app/.env
 
 # Открываем порт (если нужно)
-EXPOSE 3000
+EXPOSE 32768
 
 # Запуск приложения
 CMD ["yarn", "start"]
