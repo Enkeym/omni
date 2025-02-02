@@ -93,9 +93,10 @@ export const register = async (req, res) => {
     const caseData = {
       case: {
         user_email: email,
-        cc_emails: ["vshumovsky@getmark.ru"],
+        cc_emails: ["atsatryan@getmark.ru"],
         status: "open",
-        user_full_name: `${surname} ${firstName}`, // Или по-другому
+        content_type: "html",
+        user_full_name: `${surname} ${firstName}`,
         subject: `Регистрация. ${company}`,
         content: `Организация: ${company}
 Контакт: ${phone} ${contname}
