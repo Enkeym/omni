@@ -1,4 +1,4 @@
-# Используем lightweight-образ Node.js (например, 18)
+# Используем lightweight-образ Node.js
 FROM node:18-alpine AS builder
 
 # Устанавливаем рабочую директорию внутри контейнера
@@ -25,11 +25,8 @@ WORKDIR /app
 # Копируем только необходимые файлы из builder-образа
 COPY --from=builder /app /app
 
-# Копируем локальный .env в контейнер
-COPY .env /app/.env
-
-# Открываем порт (если нужно)
-EXPOSE 32768
+# Открываем порт 3434
+EXPOSE 3434
 
 # Запуск приложения
 CMD ["yarn", "start"]
