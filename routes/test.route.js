@@ -4,7 +4,7 @@ import { testWebhook } from "../controllers/test.controller.js"
 
 const router = Router()
 
-// Используем wildcard, чтобы маршрут матчился со всеми URL, начинающимися с "/test"
+// Любые запросы, начинающиеся с "/test", пойдут в testWebhook
 router.post("/test*", testWebhook)
 
 export default router
