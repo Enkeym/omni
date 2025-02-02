@@ -1,4 +1,4 @@
-// controllers/register.controller.js
+import { parse as qsParse } from "querystring"
 import { bitrixUrl } from "../config.js"
 import {
   createUser,
@@ -10,34 +10,74 @@ import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
 import { sendWa } from "../utils/sendWa.js"
 
-//Общий штамп для логов
+// Общий штамп для логов
 const logger = createLogger("REGISTER")
 
 /**
- * Обрабатывает тестовый запрос на регистрацию и логирует входящие данные.
- * Данные могут передаваться через тело запроса или в URL (например, в параметре data).
+ * Обрабатывает запрос на регистрацию.
+ * Данные могут передаваться через тело запроса, параметр query или непосредственно в URL.
  *
  * @param {object} req - Объект запроса Express.
  * @param {object} res - Объект ответа Express.
  */
-
 export const register = async (req, res) => {
   try {
     logger.info("Начало обработки запроса регистрации")
 
-    //Берем данные из URL
-    const dataStr = req.body || req.query.data
+    // Пытаемся получить данные из тела запроса или параметра query
+    let dataStr = req.body || req.query.data
+
+    // Если данных нет – извлекаем их из URL (после "/register")
+    if (!dataStr) {
+      // Декодируем оригинальный URL и удаляем префикс "/register"
+      dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
+      if (dataStr.startsWith("|")) {
+        dataStr = dataStr.slice(1)
+      }
+      dataStr = dataStr.trim()
+    }
 
     if (!dataStr) {
       logger.error("Тело запроса пустое")
       return res.status(400).send("Пустое тело запроса")
     }
 
-    // Разбиваем строку на массив полей по разделителю "|"
-    const fields = dataStr.split("|")
+    let fields = []
+    // Если строка содержит символы "=" и "&", предполагаем, что данные пришли в виде query‑string
+    if (dataStr.includes("=") && dataStr.includes("&")) {
+      const params = qsParse(dataStr)
+      logger.debug("Parsed query parameters:", params)
+      // Извлекаем tid из параметра document_id[2]
+      const tid = params["document_id[2]"]
+      if (!tid) {
+        logger.error("tid не найден в параметрах")
+        return res.status(400).send("tid не найден")
+      }
+      // Заполняем массив полей: tid – первое поле, остальные оставляем пустыми (0 или можно задать значения по умолчанию)
+      fields = [
+        tid, // tid
+        "", // surname
+        "", // name
+        "", // email
+        "", // company
+        "", // contname
+        "", // phone
+        "", // inn
+        "", // contmail
+        "", // tg
+        "", // cat
+        "", // role
+        "", // tarif
+        "", // comment
+        "" // gs1
+      ]
+    } else {
+      // Если данные переданы в формате "pipe-separated"
+      fields = dataStr.split("|")
+    }
+
     logger.debug("Полученные поля:", fields)
 
-    // Проверка количества элементов: ожидается 15, т.к. дублирующее поле "register" убрано
     if (fields.length !== 15) {
       logger.error("Ошибка: ожидалось 15 элементов, получено", fields.length)
       return res.status(400).send("Неверное количество элементов")
