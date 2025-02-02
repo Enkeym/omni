@@ -6,3 +6,8 @@ run:
 
 clean:
 	docker system prune -af --volumes
+
+stop:
+	docker stop omni-js || true
+	docker rm omni-js || true
+
