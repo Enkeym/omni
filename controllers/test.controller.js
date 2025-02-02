@@ -1,63 +1,38 @@
-// controllers/test.controller.js
-
 import { createLogger } from "../utils/logger.js"
 
 const logger = createLogger("TEST")
 
 /**
  * Обрабатывает тестовый запрос (например, от вебхука Bitrix) и логирует входящие данные.
- * Данные могут передаваться через тело запроса, параметр query (data)
- * или напрямую в URL ("/test|...").
+ * Полностью игнорирует служебные данные в теле, берёт строку только из URL:
+ * "/test|field1|field2|...".
  */
 export const testWebhook = async (req, res) => {
   try {
     logger.info("Получен тестовый запрос для вебхука Bitrix")
 
-    // Логирование заголовков запроса (для отладки)
-    const headersStr = JSON.stringify(req.headers, null, 2)
-    logger.debug("Заголовки запроса:", headersStr)
+    // 1. Игнорируем req.body и query, сразу извлекаем данные из URL
+    let dataStr = decodeURIComponent(req.originalUrl).replace(/^\/test/, "")
 
-    // 1. Пытаемся получить данные из тела или query
-    let dataStr = ""
-    if (typeof req.body === "string" && req.body.trim()) {
-      dataStr = req.body.trim()
-    } else if (
-      req.query.data &&
-      typeof req.query.data === "string" &&
-      req.query.data.trim()
-    ) {
-      dataStr = req.query.data.trim()
-    } else if (
-      typeof req.body === "object" &&
-      Object.keys(req.body).length > 0
-    ) {
-      // Если тело пришло в JSON или объектном виде — сериализуем
-      dataStr = JSON.stringify(req.body)
+    // Если строка начинается с "|", убираем его
+    if (dataStr.startsWith("|")) {
+      dataStr = dataStr.slice(1)
     }
+    dataStr = dataStr.trim()
 
-    // 2. Если строка всё ещё пустая, пытаемся достать из URL
-    // Например, если запрос: "/test|field1|field2|..."
+    // 2. Если пусто — выдаём ошибку
     if (!dataStr) {
-      dataStr = decodeURIComponent(req.originalUrl).replace(/^\/test/, "")
-      if (dataStr.startsWith("|")) {
-        dataStr = dataStr.slice(1) // убираем ведущий символ "|"
-      }
-      dataStr = dataStr.trim()
-      logger.debug("Извлечённые из URL данные:", dataStr)
+      logger.warn("Нет данных для обработки")
+      return res.status(400).send("Пустое тело запроса")
     }
 
-    // 3. Логируем, что получилось
-    logger.debug("Исходное тело запроса:", dataStr)
-    logger.debug("Тип данных запроса:", typeof dataStr)
+    // 3. Разбиваем строку на массив полей по символу "|"
+    const fields = dataStr.split("|")
 
-    // 4. Разбиваем строку на массив по "|", если dataStr не пустая
-    let fields = []
-    if (dataStr) {
-      fields = dataStr.split("|")
-      logger.debug("Разбитые поля:", JSON.stringify(fields, null, 2))
-    }
+    logger.debug("Исходная строка:", dataStr)
+    logger.debug("Разбитые поля:", JSON.stringify(fields, null, 2))
 
-    // 5. Формируем ответ
+    // 4. Отправляем ответ клиенту с полученными данными
     res.status(200).json({
       message: "Данные вебхука успешно получены и залогированы",
       headers: req.headers,

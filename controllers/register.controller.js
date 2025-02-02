@@ -20,37 +20,29 @@ const logger = createLogger("REGISTER")
 export const register = async (req, res) => {
   try {
     logger.info("Начало обработки запроса регистрации")
+    // 1. Сразу ИГНОРИРУЕМ req.body, потому что там лежат document_id=...
+    // let dataStr = req.body || req.query.data;
+    let dataStr = ""
 
-    // 1. Пытаемся получить строку из тела (req.body) или из query (req.query.data)
-    let dataStr = req.body || req.query.data
-
-    // 2. Если всё ещё нет данных, пробуем вытащить их из URL
-    // Например, если запрос выглядит как "/register|123|Иванов|..."
-    if (!dataStr) {
-      // req.originalUrl может содержать "/register|123|..."
-      // Удаляем "/register" (точнее, всё, что до символа "|")
-      dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
-      if (dataStr.startsWith("|")) {
-        dataStr = dataStr.slice(1) // убираем ведущий символ "|"
-      }
-      dataStr = dataStr.trim()
-      logger.debug("Извлечённые из URL данные:", dataStr)
+    // 2. Всегда берём URL:
+    //    req.originalUrl может быть "/register|D_52230|Название|..."
+    dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
+    if (dataStr.startsWith("|")) {
+      dataStr = dataStr.slice(1)
     }
+    dataStr = dataStr.trim()
 
-    // 3. Если в итоге нет ничего, завершаем с ошибкой
+    // 3. Если получилось пусто — ошибку
     if (!dataStr) {
-      logger.error("Тело запроса пустое")
       return res.status(400).send("Пустое тело запроса")
     }
 
-    // 4. Разбиваем строку на поля по символу "|"
+    // 4. Разбиваем по "|"
     const fields = dataStr.split("|")
-    logger.debug("Полученные поля:", fields)
-
-    // Проверяем количество элементов — ожидаем ровно 15
     if (fields.length !== 15) {
-      logger.error("Ошибка: ожидалось 15 элементов, получено", fields.length)
-      return res.status(400).send("Неверное количество элементов")
+      return res
+        .status(400)
+        .send(`Неверное количество элементов: ${fields.length}`)
     }
 
     // 5. Деструктуризация (15 полей)
