@@ -1,0 +1,5 @@
+.env
+.eslintrc.json
+node_modules
+nodemon.json
+yarn.lock
