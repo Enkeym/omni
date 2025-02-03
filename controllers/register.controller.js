@@ -82,7 +82,7 @@ export const register = async (req, res) => {
     logger.debug("Ссылка на заявку:", dealUrl)
 
     // Пример обработки тарифа (если требуется)
-    const tarifText = extractTarifText(tarif)
+    let tarifText = extractTarifText(tarif)
     tarifText = cleanOmniNotes(tarifText)
     logger.debug("Обработанный тариф:", tarifText)
 
