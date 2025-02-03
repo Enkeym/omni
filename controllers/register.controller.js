@@ -6,6 +6,7 @@ import {
   getUser,
   postCase
 } from "../services/omniService.js"
+import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
 import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
 import { sendWa } from "../utils/sendWa.js"
@@ -82,6 +83,7 @@ export const register = async (req, res) => {
 
     // Пример обработки тарифа (если требуется)
     const tarifText = extractTarifText(tarif)
+    tarifText = cleanOmniNotes(tarifText)
     logger.debug("Обработанный тариф:", tarifText)
 
     // Проверяем, что телефон не пустой, иначе WhatsApp упадёт
@@ -92,12 +94,12 @@ export const register = async (req, res) => {
     // Формируем данные для OmniDesk (пример)
     const caseData = {
       case: {
-        user_email: email,
+        anonymous_email: `user+${Data.now()}@getmark.ru`,
         cc_emails: ["atsatryan@getmark.ru"],
         status: "open",
         content_type: "html",
         user_full_name: `${surname} ${firstName}`,
-        subject: `Регистрация. ${company}`,
+        subject: `Регистрация. ${company} - ${Date.now()}`,
         content: `Организация: ${company}
 Контакт: ${phone} ${contname}
 Категория: ${cat} ${role}

@@ -11,3 +11,4 @@ stop:
 	docker stop omni-js || true
 	docker rm omni-js || true
 
+rebuild: stop build run
