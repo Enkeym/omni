@@ -1,7 +1,10 @@
 // utils/sendWa.js
 import axios from "axios"
 import { wazzupChannelId, wazzupToken, wazzupUrl } from "../config.js"
+import { createLogger } from "./logger.js"
 import { text1, text2 } from "./textMessages.js"
+
+const logger = createLogger("WATSAPP")
 
 const headers = {
   "Content-Type": "application/json",

@@ -1,11 +1,6 @@
 // controllers/register.controller.js
 import { bitrixUrl } from "../config.js"
-import {
-  createUser,
-  editUser,
-  getUser,
-  postCase
-} from "../services/omniService.js"
+import { createUser, getUser, postCase } from "../services/omniService.js"
 import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
 import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
@@ -131,31 +126,31 @@ ${comment ? "❗ Комментарий: " + comment : ""}
     }
 
     logger.info("Получение данных пользователя по телефону:", phone)
-    const { data: userResponse } = await getUser({
-      user_phone: phone,
-      user_email: contmail
-    })
-    logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
+    try {
+      const { data: userResponse } = await getUser({
+        user_phone: phone,
+        user_email: contmail
+      })
+      logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
 
-    if (userResponse && Object.keys(userResponse).length > 0) {
-      // Пользователь найден – обновляем профиль
-      const { user = {} } = userResponse["0"] || {}
-      const userId = user.user_id
-      logger.info("Пользователь найден. ID:", userId)
+      // Ищем пользователя
+      if (userResponse && Object.keys(userResponse).length > 0) {
+        logger.warn(
+          "Пользователь найден, но создаём новый профиль принудительно."
+        )
+      }
+    } catch (error) {
+      logger.error("Ошибка при получении данных пользователя:", error.message)
+    }
 
-      // Удаляем поля, которые не следует обновлять
-      delete userData.user.user_email
-      delete userData.user.user_phone
-      delete userData.user.user_telegram
-
-      logger.info("Обновляем профиль пользователя")
-      const { data: editData } = await editUser(userId, userData)
-      logger.info("Профиль обновлён:", editData)
-    } else {
-      // Пользователь не найден – создаём новый профиль
-      logger.info("Пользователь не найден. Создание нового профиля")
+    // Создаем новый профиль
+    try {
+      logger.info("СОздание нового профиля пользователя")
       const { data: createData } = await createUser(userData)
-      logger.info("Новый профиль создан:", createData)
+      logger.info("Новый профиль успешно создан:", createData)
+    } catch (error) {
+      logger.error("Ошибка при создании пользователя:", error.message)
+      return res.status(500).send("Ошибка при создании нового пользователя")
     }
 
     // Если всё успешно
