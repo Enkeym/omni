@@ -131,7 +131,10 @@ ${comment ? "❗ Комментарий: " + comment : ""}
     }
 
     logger.info("Получение данных пользователя по телефону:", phone)
-    const { data: userResponse } = await getUser({ user_phone: phone })
+    const { data: userResponse } = await getUser({
+      user_phone: phone,
+      user_email: contmail
+    })
     logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
 
     if (userResponse && Object.keys(userResponse).length > 0) {
