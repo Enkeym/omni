@@ -94,7 +94,7 @@ export const register = async (req, res) => {
     // Формируем данные для OmniDesk (пример)
     const caseData = {
       case: {
-        user_email: `user+${Date.now()}@getmark.ru`,
+        user_email: email,
         cc_emails: ["atsatryan@getmark.ru"],
         status: "open",
         content_type: "html",
