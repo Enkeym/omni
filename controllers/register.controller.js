@@ -4,7 +4,6 @@ import { createUser, getUser, postCase } from "../services/omniService.js"
 import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
 import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
-import { sendWa } from "../utils/sendWa.js"
 
 const logger = createLogger("REGISTER")
 
@@ -82,9 +81,13 @@ export const register = async (req, res) => {
     logger.debug("Обработанный тариф:", tarifText)
 
     // Проверяем, что телефон не пустой, иначе WhatsApp упадёт
-    logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
+    /*     logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
     const waStatus = phone ? await sendWa(phone) : "не отправлена ❌"
-    logger.info("Статус WhatsApp уведомления:", waStatus)
+    logger.info("Статус WhatsApp уведомления:", waStatus) */
+    // Вместо этого просто подставляем "не отправлена ❌"
+
+    //Отключил отправку в WhatsApp
+    const waStatus = "не отправлена ❌"
 
     // Формируем данные для OmniDesk (пример)
     const caseData = {
@@ -107,7 +110,9 @@ ${comment ? "❗ Комментарий: " + comment : ""}
       }
     }
 
-    // Логируем данные перед отправкой
+    // Логируем данные перед отправкой в OmniDesk
+    logger.info("Отправляемые данные в OmniDesk:")
+    console.log(JSON.stringify(caseData, null, 2)) // Принудительный вывод в консоль
     logger.debug(
       "Отправляемые данные в OmniDesk:",
       JSON.stringify(caseData, null, 2)
