@@ -81,13 +81,12 @@ export const register = async (req, res) => {
     logger.debug("Обработанный тариф:", tarifText)
 
     // Проверяем, что телефон не пустой, иначе WhatsApp упадёт
-    /*     logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
+    logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
     const waStatus = phone ? await sendWa(phone) : "не отправлена ❌"
-    logger.info("Статус WhatsApp уведомления:", waStatus) */
-    // Вместо этого просто подставляем "не отправлена ❌"
+    logger.info("Статус WhatsApp уведомления:", waStatus)
 
-    //Отключил отправку в WhatsApp
-    const waStatus = "не отправлена ❌"
+    // MOK
+    //const waStatus = "не отправлена ❌"
 
     // Формируем данные для OmniDesk (пример)
     const caseData = {

@@ -22,7 +22,7 @@ const createMessagePayload = (phone, text) => ({
  * @returns {Promise<string>} Статус отправки сообщений.
  */
 
-/* export const sendWa = async (phone) => {
+export const sendWa = async (phone) => {
   const sanitizedPhone = phone.replace(/\D/g, "")
 
   //Сообщения для WatsApp
@@ -47,9 +47,10 @@ const createMessagePayload = (phone, text) => ({
     )
     return "не отправлена ❌"
   }
-} */
+}
 
-export const sendWa = async (phone) => {
+// МОК
+/* export const sendWa = async (phone) => {
   logger.info(`(МОК) WhatsApp сообщение для ${phone} не отправлено.`)
   return "не отправлена ❌"
-}
+} */
