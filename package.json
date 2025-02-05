@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "lint": "eslint ."
   },
   "repository": "https://github.com/Enkeym/omni.git",
   "author": "Enkeym <julian1996@yandex.ru>",

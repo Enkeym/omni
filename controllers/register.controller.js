@@ -61,17 +61,6 @@ export const register = async (req, res) => {
     ] = fields
     logger.info("Поля запроса успешно разобраны")
 
-    // Пример лога
-    logger.debug(
-      "tid:",
-      tid,
-      "surname:",
-      surname,
-      "firstName:",
-      firstName,
-      "..."
-    )
-
     // Формирование ссылки на заявку в Bitrix24
     const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
     logger.debug("Ссылка на заявку:", dealUrl)
@@ -109,31 +98,15 @@ ${comment ? "❗ Комментарий: " + comment : ""}
 `
       }
     }
-
-    // Логируем данные перед отправкой в OmniDesk
-    logger.info("Отправляемые данные в OmniDesk (Объект caseData):")
-    console.log("caseData:", caseData)
-    console.log("caseData JSON:", JSON.stringify(caseData, null, 2))
-
-    // Создаём заявку в OmniDesk
-    logger.info("Отправка данных заявки в OmniDesk")
+    logger.debug(
+      "Отправляемые данные в OmniDesk:",
+      JSON.stringify(caseData, null, 2)
+    )
     const { status } = await postCase(caseData)
     logger.info("Заявка создана. Статус ответа:", status)
 
-    // Создание / обновление профиля пользователя (пример)
-    const userData = {
-      user: {
-        user_full_name: contname,
-        company_name: company,
-        company_position: inn,
-        user_phone: phone,
-        user_email: contmail,
-        user_telegram: tg.replace("@", ""),
-        user_note: tarifText
-      }
-    }
-
     logger.info("Получение данных пользователя по телефону:", phone)
+    let existingUser
     try {
       const { data: userResponse } = await getUser({
         user_phone: phone,
@@ -141,28 +114,51 @@ ${comment ? "❗ Комментарий: " + comment : ""}
       })
       logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
 
-      // Ищем пользователя
       if (userResponse && Object.keys(userResponse).length > 0) {
-        logger.warn(
-          "Пользователь найден, но создаём новый профиль принудительно."
-        )
+        existingUser = userResponse[0]?.user || null
+        logger.warn("Пользователь найден:", existingUser?.user_id)
       }
     } catch (error) {
       logger.error("Ошибка при получении данных пользователя:", error.message)
     }
 
-    // Создаем новый профиль
-    try {
-      logger.info("СОздание нового профиля пользователя")
-      const { data: createData } = await createUser(userData)
-      logger.info("Новый профиль успешно создан:", createData)
-    } catch (error) {
-      logger.error("Ошибка при создании пользователя:", error.message)
-      return res.status(500).send("Ошибка при создании нового пользователя")
+    if (existingUser) {
+      logger.warn("Пользователь уже существует, создание нового не требуется.")
+      return res.sendStatus(200)
     }
 
-    // Если всё успешно
-    res.sendStatus(200)
+    const uniqueEmail = `user+${Date.now()}@getmark.ru`
+    const userData = {
+      user: {
+        user_full_name: contname,
+        company_name: company,
+        company_position: inn,
+        user_phone: phone,
+        user_email: uniqueEmail,
+        user_telegram: tg.replace("@", ""),
+        user_note: tarifText
+      }
+    }
+
+    try {
+      const { data: createData } = await createUser(userData)
+      logger.info("Новый профиль успешно создан:", createData)
+      res.sendStatus(200)
+    } catch (error) {
+      logger.error("Ошибка при создании пользователя:", error.message)
+      if (error.response) {
+        logger.error(
+          "Детали ошибки:",
+          JSON.stringify(error.response.data, null, 2)
+        )
+        logger.error("HTTP Статус ответа:", error.response.status)
+        logger.error(
+          "Заголовки ответа:",
+          JSON.stringify(error.response.headers, null, 2)
+        )
+      }
+      res.status(500).send("Ошибка при создании нового пользователя")
+    }
   } catch (error) {
     logger.error("Ошибка при обработке регистрации:", error.message)
     res.status(500).send("Внутренняя ошибка сервера")
