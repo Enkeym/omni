@@ -1,5 +1,5 @@
 build:
-	docker build --no-cache -t omni .
+	docker build -t omni .
 
 run:
 	docker run -d --restart unless-stopped -p 3434:3434 --env-file .env --name omni omni
