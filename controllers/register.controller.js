@@ -4,6 +4,7 @@ import { createUser, getUser, postCase } from "../services/omniService.js"
 import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
 import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
+import { sendWa } from "../utils/sendWa.js"
 
 const logger = createLogger("REGISTER")
 
