@@ -1,8 +1,6 @@
 // utils/sendWa.js
-import axios from "axios"
-import { wazzupChannelId, wazzupToken, wazzupUrl } from "../config.js"
+import { wazzupChannelId, wazzupToken } from "../config.js"
 import { createLogger } from "./logger.js"
-import { text1, text2 } from "./textMessages.js"
 
 const logger = createLogger("WATSAPP")
 
@@ -23,7 +21,8 @@ const createMessagePayload = (phone, text) => ({
  * @param {string} phone - Номер телефона для отправки сообщения.
  * @returns {Promise<string>} Статус отправки сообщений.
  */
-export const sendWa = async (phone) => {
+
+/* export const sendWa = async (phone) => {
   const sanitizedPhone = phone.replace(/\D/g, "")
 
   //Сообщения для WatsApp
@@ -48,4 +47,9 @@ export const sendWa = async (phone) => {
     )
     return "не отправлена ❌"
   }
+} */
+
+export const sendWa = async (phone) => {
+  logger.info(`(МОК) WhatsApp сообщение для ${phone} не отправлено.`)
+  return "не отправлена ❌"
 }
