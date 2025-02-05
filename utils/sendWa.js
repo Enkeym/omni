@@ -1,6 +1,7 @@
 // utils/sendWa.js
 import { wazzupChannelId, wazzupToken } from "../config.js"
 import { createLogger } from "./logger.js"
+import { text1, text2 } from "./textMessages.js"
 
 const logger = createLogger("WATSAPP")
 
