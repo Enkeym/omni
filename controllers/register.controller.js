@@ -107,6 +107,12 @@ ${comment ? "❗ Комментарий: " + comment : ""}
       }
     }
 
+    // Логируем данные перед отправкой
+    logger.debug(
+      "Отправляемые данные в OmniDesk:",
+      JSON.stringify(caseData, null, 2)
+    )
+
     // Создаём заявку в OmniDesk
     logger.info("Отправка данных заявки в OmniDesk")
     const { status } = await postCase(caseData)
