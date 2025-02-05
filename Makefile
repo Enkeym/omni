@@ -8,7 +8,7 @@ clean:
 	docker system prune -af --volumes
 
 stop:
-	docker stop omni || true
-	docker rm omni || true
+	docker stop omni
+	docker rm omni
 
 rebuild: stop clean build run
