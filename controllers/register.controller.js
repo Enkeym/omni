@@ -111,12 +111,9 @@ ${comment ? "❗ Комментарий: " + comment : ""}
     }
 
     // Логируем данные перед отправкой в OmniDesk
-    logger.info("Отправляемые данные в OmniDesk:")
-    console.log(JSON.stringify(caseData, null, 2)) // Принудительный вывод в консоль
-    logger.debug(
-      "Отправляемые данные в OmniDesk:",
-      JSON.stringify(caseData, null, 2)
-    )
+    logger.info("Отправляемые данные в OmniDesk (Объект caseData):")
+    console.log("caseData:", caseData)
+    console.log("caseData JSON:", JSON.stringify(caseData, null, 2))
 
     // Создаём заявку в OmniDesk
     logger.info("Отправка данных заявки в OmniDesk")
