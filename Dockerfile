@@ -1,5 +1,5 @@
 # Используем lightweight-образ Node.js
-FROM node:18-bullseye AS builder
+FROM node:18-alpine AS builder
 
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
