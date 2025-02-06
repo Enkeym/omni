@@ -53,3 +53,37 @@ export const editUser = async (userId, data) => {
   const url = `${omnideskUrl}/api/users/${userId}.json`
   return axios.put(url, data, { headers, auth })
 }
+
+// Удаляем все заявки пользователя, кроме последней
+export const deleteOldCases = async (userId) => {
+  try {
+    const response = await axios.get(`${omnideskUrl}/api/cases.json`, {
+      params: { user_id: userId },
+      headers,
+      auth
+    })
+
+    const cases = response.data.cases || []
+
+    if (cases.length <= 1) {
+      console.log("Заявок меньше двух, ничего не удаляем.")
+      return 0
+    }
+
+    // Отсортируем заявки по дате создания (убедимся, что последняя - самая новая)
+    cases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+    let deletedCount = 0
+    for (let i = 1; i < cases.length; i++) {
+      await axios.delete(`${omnideskUrl}/api/cases/${cases[i].id}.json`, {
+        headers,
+        auth
+      })
+      deletedCount++
+    }
+
+    return deletedCount
+  } catch (error) {
+    throw new Error(`Ошибка при удалении заявок: ${error.message}`)
+  }
+}

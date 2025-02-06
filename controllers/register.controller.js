@@ -1,6 +1,10 @@
-// controllers/register.controller.js
 import { bitrixUrl } from "../config.js"
-import { createUser, getUser, postCase } from "../services/omniService.js"
+import {
+  createUser,
+  deleteOldCases,
+  getUser,
+  postCase
+} from "../services/omniService.js"
 import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
 import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
@@ -15,46 +19,74 @@ const logger = createLogger("REGISTER")
  */
 export const register = async (req, res) => {
   try {
-    logger.info("Начало обработки запроса регистрации")
-    let dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
+    logger.info("🔹 Начало обработки запроса регистрации")
 
-    // Если строка начинается с "|", убираем его
+    // Выводим URL запроса перед обработкой
+    logger.debug("🔹 Исходный URL запроса:", req.originalUrl)
+
+    // Декодируем URL и удаляем /register
+    let dataStr = decodeURIComponent(req.originalUrl)
+      .replace(/^\/register/, "")
+      .trim()
+
+    // Логируем после декодирования
+    logger.debug("🔹 Декодированная строка данных:", dataStr)
+
+    // Проверяем, начинается ли строка с "|", удаляем
     if (dataStr.startsWith("|")) {
       dataStr = dataStr.slice(1)
+      logger.debug("🔹 Убрали начальный '|', новая строка данных:", dataStr)
     }
-    dataStr = dataStr.trim()
 
-    // Проверка на пустое тело запроса
+    // Проверяем, пустая ли строка
     if (!dataStr) {
+      logger.error("❌ Ошибка: Пустое тело запроса")
       return res.status(400).send("Пустое тело запроса")
     }
 
-    // Разбиваем строку на массив полей по символу "|"
+    // Разбиваем строку по "|"
     const fields = dataStr.split("|")
+
+    // Логируем полученный массив
+    logger.debug("🔹 Разбитые данные (fields):", fields)
+
+    // Проверяем корректное количество полей
     if (fields.length !== 15) {
+      logger.error(
+        `❌ Ошибка: Неверное количество элементов: ${fields.length} вместо 15`
+      )
       return res
         .status(400)
         .send(`Неверное количество элементов: ${fields.length}`)
     }
 
-    // 5. Деструктуризация (15 полей)
+    // Деструктуризация полей
     const [
-      tid, // {{ID элемента CRM}}
-      surname, // {{Контакт: Фамилия}}
-      firstName, // {{Контакт: Имя}}
-      email, // {{Ответственный (e-mail)}}
-      company, // {{Компания: Название компании}}
-      contname, // {{Контакт: Имя}} - дублирующее поле или "другое контактное лицо"
-      phone, // {{Контакт: Рабочий телефон}}
-      inn, // {{ИНН}}
-      contmail, // {{Эл.почта}}
-      tg, // {{Телеграм}}
-      cat, // {{Категория}}
-      role, // {{Роль (вид торговли) (текст)}}
-      tarif, // [td]{{Товарные позиции (текст)}}[/td]
-      comment, // {{Комментарий для тех. отдела}}
-      gs1 // {{ГС1 > printable}}
+      tid,
+      surname,
+      firstName,
+      email,
+      company,
+      contname,
+      phone,
+      inn,
+      contmail,
+      tg,
+      cat,
+      role,
+      tarif,
+      comment,
+      gs1
     ] = fields
+
+    logger.info("✅ Поля запроса успешно разобраны")
+    logger.debug("🔹 tid:", tid)
+    logger.debug("🔹 surname:", surname)
+    logger.debug("🔹 firstName:", firstName)
+    logger.debug("🔹 email:", email)
+    logger.debug("🔹 company:", company)
+    logger.debug("🔹 phone:", phone)
+
     logger.info("Поля запроса успешно разобраны")
 
     const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
@@ -63,6 +95,7 @@ export const register = async (req, res) => {
     // Получение данных о пользователи
     logger.info("Получение данных пользователя по телефону:", phone)
     let existingUser = null
+
     try {
       const { data: userResponse } = await getUser({
         user_phone: phone,
@@ -70,22 +103,36 @@ export const register = async (req, res) => {
       })
       logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
 
-      if (userResponse && Object.keys(userResponse).length > 0) {
-        existingUser = userResponse[0]?.user || null
+      // Фильтруем пользователей по email и номеру
+      const matchedUser = Object.values(userResponse).find((userObj) => {
+        const user = userObj.user
+        return (
+          user.user_phone === phone ||
+          user.wa_id === phone ||
+          user.user_email === contmail
+        )
+      })
+
+      if (matchedUser) {
+        existingUser = matchedUser.user
         logger.warn("Пользователь найден, ID:", existingUser?.user_id)
       }
     } catch (error) {
       logger.error("Ошибка при получении данных пользователя:", error.message)
     }
 
-    // Если пользователь есть
+    // Если пользователь найден, удаляем старые заявки, кроме последней
     if (existingUser) {
-      logger.warn("Пользователь уже существует, создание нового не требуется.")
-      return res.sendStatus(200)
+      logger.warn(
+        "Пользователь уже существует. Удаляем старые заявки, кроме последней..."
+      )
+      try {
+        const deletedCount = await deleteOldCases(existingUser.user_id)
+        logger.info(`Удалено старых заявок: ${deletedCount}`)
+      } catch (error) {
+        logger.error("Ошибка при удалении старых заявок:", error.message)
+      }
     }
-
-    // Пользователь не найдет
-    logger.info("Пользователь не найден, создаём нового.")
 
     // Отправляем уведомление через WhatsApp
     logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
@@ -113,13 +160,31 @@ ${comment ? "❗ Комментарий: " + comment : ""}`
     }
 
     logger.debug(
-      "Отправляемые данные в OmniDesk:",
+      "Отправляем заявку в OmniDesk:",
       JSON.stringify(caseData, null, 2)
     )
-    const { status } = await postCase(caseData)
-    logger.info("Заявка создана. Статус ответа:", status)
+    try {
+      const { status, data } = await postCase(caseData)
+      logger.info(`Заявка отправлена в OmniDesk. Статус: ${status}`)
+      logger.debug("Ответ OmniDesk:", JSON.stringify(data, null, 2))
+    } catch (error) {
+      logger.error("Ошибка при отправке заявки в OmniDesk:", error.message)
+      if (error.response) {
+        logger.error(
+          "Детали ошибки:",
+          JSON.stringify(error.response.data, null, 2)
+        )
+        logger.error("HTTP статус:", error.response.status)
+      }
+    }
 
-    // Используем email из запроса вместо уникального email
+    // Если пользователь уже существовал, новую заявку создали, но пользователя обновлять не нужно
+    if (existingUser) {
+      return res.sendStatus(200)
+    }
+
+    // Создание нового пользователя
+    logger.info("Создаем новый профиль пользователя...")
     const userData = {
       user: {
         user_full_name: contname,
