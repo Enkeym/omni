@@ -13,7 +13,8 @@ export default [
     },
     rules: {
       "no-undef": "error",
-      "no-console": "off"
+      "no-console": "off",
+      "import/no-unresolved": "off"
     }
   }
 ]

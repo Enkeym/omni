@@ -16,24 +16,20 @@ const logger = createLogger("REGISTER")
 export const register = async (req, res) => {
   try {
     logger.info("Начало обработки запроса регистрации")
-    // 1. Сразу ИГНОРИРУЕМ req.body, потому что там лежат document_id=...
-    // let dataStr = req.body || req.query.data;
-    let dataStr = ""
+    let dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
 
-    // 2. Всегда берём URL:
-    //    req.originalUrl может быть "/register|D_52230|Название|..."
-    dataStr = decodeURIComponent(req.originalUrl).replace(/^\/register/, "")
+    // Если строка начинается с "|", убираем его
     if (dataStr.startsWith("|")) {
       dataStr = dataStr.slice(1)
     }
     dataStr = dataStr.trim()
 
-    // 3. Если получилось пусто — ошибку
+    // Проверка на пустое тело запроса
     if (!dataStr) {
       return res.status(400).send("Пустое тело запроса")
     }
 
-    // 4. Разбиваем по "|"
+    // Разбиваем строку на массив полей по символу "|"
     const fields = dataStr.split("|")
     if (fields.length !== 15) {
       return res
@@ -61,24 +57,42 @@ export const register = async (req, res) => {
     ] = fields
     logger.info("Поля запроса успешно разобраны")
 
-    // Формирование ссылки на заявку в Bitrix24
     const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
-    logger.debug("Ссылка на заявку:", dealUrl)
+    let tarifText = cleanOmniNotes(extractTarifText(tarif))
 
-    // Пример обработки тарифа (если требуется)
-    let tarifText = extractTarifText(tarif)
-    tarifText = cleanOmniNotes(tarifText)
-    logger.debug("Обработанный тариф:", tarifText)
+    // Получение данных о пользователи
+    logger.info("Получение данных пользователя по телефону:", phone)
+    let existingUser = null
+    try {
+      const { data: userResponse } = await getUser({
+        user_phone: phone,
+        user_email: contmail
+      })
+      logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
 
-    // Проверяем, что телефон не пустой, иначе WhatsApp упадёт
+      if (userResponse && Object.keys(userResponse).length > 0) {
+        existingUser = userResponse[0]?.user || null
+        logger.warn("Пользователь найден, ID:", existingUser?.user_id)
+      }
+    } catch (error) {
+      logger.error("Ошибка при получении данных пользователя:", error.message)
+    }
+
+    // Если пользователь есть
+    if (existingUser) {
+      logger.warn("Пользователь уже существует, создание нового не требуется.")
+      return res.sendStatus(200)
+    }
+
+    // Пользователь не найдет
+    logger.info("Пользователь не найден, создаём нового.")
+
+    // Отправляем уведомление через WhatsApp
     logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
     const waStatus = phone ? await sendWa(phone) : "не отправлена ❌"
     logger.info("Статус WhatsApp уведомления:", waStatus)
 
-    // MOK
-    //const waStatus = "не отправлена ❌"
-
-    // Формируем данные для OmniDesk (пример)
+    // Создаём заявку
     const caseData = {
       case: {
         user_email: email,
@@ -94,10 +108,10 @@ export const register = async (req, res) => {
 Инструкция: ${waStatus}
 Ссылка на заявку: ${dealUrl}
 ${gs1 === "Да" ? "🌐 Регистрация в ГС1!" : ""}
-${comment ? "❗ Комментарий: " + comment : ""}
-`
+${comment ? "❗ Комментарий: " + comment : ""}`
       }
     }
+
     logger.debug(
       "Отправляемые данные в OmniDesk:",
       JSON.stringify(caseData, null, 2)
@@ -105,36 +119,14 @@ ${comment ? "❗ Комментарий: " + comment : ""}
     const { status } = await postCase(caseData)
     logger.info("Заявка создана. Статус ответа:", status)
 
-    logger.info("Получение данных пользователя по телефону:", phone)
-    let existingUser
-    try {
-      const { data: userResponse } = await getUser({
-        user_phone: phone,
-        user_email: contmail
-      })
-      logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
-
-      if (userResponse && Object.keys(userResponse).length > 0) {
-        existingUser = userResponse[0]?.user || null
-        logger.warn("Пользователь найден:", existingUser?.user_id)
-      }
-    } catch (error) {
-      logger.error("Ошибка при получении данных пользователя:", error.message)
-    }
-
-    if (existingUser) {
-      logger.warn("Пользователь уже существует, создание нового не требуется.")
-      return res.sendStatus(200)
-    }
-
-    const uniqueEmail = `user+${Date.now()}@getmark.ru`
+    // Используем email из запроса вместо уникального email
     const userData = {
       user: {
         user_full_name: contname,
         company_name: company,
         company_position: inn,
         user_phone: phone,
-        user_email: uniqueEmail,
+        user_email: contmail,
         user_telegram: tg.replace("@", ""),
         user_note: tarifText
       }
