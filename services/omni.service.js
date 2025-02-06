@@ -1,5 +1,6 @@
 // services/omniService.js
 import axios from "axios"
+
 import { omnideskApiKey, omnideskEmail, omnideskUrl } from "../config.js"
 
 // Общие настройки для всех запросов
@@ -70,14 +71,24 @@ export const deleteUsers = async (users) => {
   for (const user of users) {
     try {
       const url = `${omnideskUrl}/api/users/${user.user_id}.json`
-      await axios.delete(url, { headers, auth })
-      console.log(`✅ Пользователь (ID: ${user.user_id}) удален.`)
+      const response = await axios.delete(url, { headers, auth })
+      console.log(
+        `✅ Ответ сервера при удалении пользователя (ID: ${user.user_id}):`,
+        response.status
+      )
       deletedCount++
     } catch (error) {
       console.error(
         `❌ Ошибка при удалении пользователя (ID: ${user.user_id}):`,
         error.message
       )
+      if (error.response) {
+        console.error(
+          "📌 Детали ошибки:",
+          JSON.stringify(error.response.data, null, 2)
+        )
+        console.error("📌 HTTP статус:", error.response.status)
+      }
     }
   }
 
