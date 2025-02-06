@@ -1,7 +1,7 @@
 import { bitrixUrl } from "../config.js"
 import {
   createUser,
-  deleteOldCases,
+  deleteUsers,
   getUser,
   postCase
 } from "../services/omniService.js"
@@ -14,8 +14,6 @@ const logger = createLogger("REGISTER")
 
 /**
  * Обрабатывает запрос на регистрацию и логирует входящие данные.
- * Данные могут передаваться через тело запроса, в query-параметре data
- * или непосредственно в URL (например, /register|ID|...).
  */
 export const register = async (req, res) => {
   try {
@@ -87,59 +85,54 @@ export const register = async (req, res) => {
     logger.debug("🔹 company:", company)
     logger.debug("🔹 phone:", phone)
 
-    logger.info("Поля запроса успешно разобраны")
-
     const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
     let tarifText = cleanOmniNotes(extractTarifText(tarif))
 
-    // Получение данных о пользователи
-    logger.info("Получение данных пользователя по телефону:", phone)
-    let existingUser = null
+    // 🔍 **Поиск существующих пользователей**
+    logger.info("🔍 Получение данных пользователя по телефону и email...")
+    let existingUsers = []
 
     try {
-      const { data: userResponse } = await getUser({
-        user_phone: phone,
-        user_email: contmail
-      })
-      logger.debug("Ответ OmniDesk при получении пользователя:", userResponse)
+      existingUsers = await getUser({ user_phone: phone, user_email: contmail })
 
-      // Фильтруем пользователей по email и номеру
-      const matchedUser = Object.values(userResponse).find((userObj) => {
-        const user = userObj.user
-        return (
-          user.user_phone === phone ||
-          user.wa_id === phone ||
-          user.user_email === contmail
-        )
-      })
+      // Фильтруем корректных пользователей
+      existingUsers = existingUsers.filter((user) => user && user.user_id)
 
-      if (matchedUser) {
-        existingUser = matchedUser.user
-        logger.warn("Пользователь найден, ID:", existingUser?.user_id)
-      }
+      logger.debug("📌 Все пользователи, найденные в OmniDesk:", existingUsers)
     } catch (error) {
-      logger.error("Ошибка при получении данных пользователя:", error.message)
+      logger.error(
+        "❌ Ошибка при получении данных пользователя:",
+        error.message
+      )
     }
 
-    // Если пользователь найден, удаляем старые заявки, кроме последней
-    if (existingUser) {
+    // ✅ **Удаление старых пользователей, если найдено больше одного**
+    if (existingUsers.length > 1) {
       logger.warn(
-        "Пользователь уже существует. Удаляем старые заявки, кроме последней..."
+        `⚠️ Найдено ${existingUsers.length} пользователей. Удаляем всех.`
       )
       try {
-        const deletedCount = await deleteOldCases(existingUser.user_id)
-        logger.info(`Удалено старых заявок: ${deletedCount}`)
+        const deletedCount = await deleteUsers(existingUsers)
+        logger.info(`✅ Удалено пользователей: ${deletedCount}`)
       } catch (error) {
-        logger.error("Ошибка при удалении старых заявок:", error.message)
+        logger.error("❌ Ошибка при удалении пользователей:", error.message)
       }
     }
 
-    // Отправляем уведомление через WhatsApp
-    logger.info("Отправка уведомления через WhatsApp для телефона:", phone)
-    const waStatus = phone ? await sendWa(phone) : "не отправлена ❌"
-    logger.info("Статус WhatsApp уведомления:", waStatus)
+    // Если пользователь уже существует и остался только один, просто возвращаем его
+    if (existingUsers.length === 1) {
+      logger.warn(
+        `✅ Пользователь уже существует (ID: ${existingUsers[0].user_id}), создание не требуется.`
+      )
+      return res.sendStatus(200)
+    }
 
-    // Создаём заявку
+    // 📲 **Отправляем уведомление через WhatsApp**
+    logger.info("📲 Отправка уведомления через WhatsApp для телефона:", phone)
+    const waStatus = phone ? await sendWa(phone) : "не отправлена ❌"
+    logger.info("📌 Статус WhatsApp уведомления:", waStatus)
+
+    // 📝 **Создаём новую заявку**
     const caseData = {
       case: {
         user_email: email,
@@ -160,31 +153,27 @@ ${comment ? "❗ Комментарий: " + comment : ""}`
     }
 
     logger.debug(
-      "Отправляем заявку в OmniDesk:",
+      "📩 Отправляем заявку в OmniDesk:",
       JSON.stringify(caseData, null, 2)
     )
+
     try {
       const { status, data } = await postCase(caseData)
-      logger.info(`Заявка отправлена в OmniDesk. Статус: ${status}`)
-      logger.debug("Ответ OmniDesk:", JSON.stringify(data, null, 2))
+      logger.info(`✅ Заявка успешно отправлена в OmniDesk. Статус: ${status}`)
+      logger.debug("📌 Ответ OmniDesk:", JSON.stringify(data, null, 2))
     } catch (error) {
-      logger.error("Ошибка при отправке заявки в OmniDesk:", error.message)
+      logger.error("❌ Ошибка при отправке заявки в OmniDesk:", error.message)
       if (error.response) {
         logger.error(
-          "Детали ошибки:",
+          "📌 Детали ошибки:",
           JSON.stringify(error.response.data, null, 2)
         )
-        logger.error("HTTP статус:", error.response.status)
+        logger.error("📌 HTTP статус:", error.response.status)
       }
     }
 
-    // Если пользователь уже существовал, новую заявку создали, но пользователя обновлять не нужно
-    if (existingUser) {
-      return res.sendStatus(200)
-    }
-
-    // Создание нового пользователя
-    logger.info("Создаем новый профиль пользователя...")
+    // 🆕 **Создание нового пользователя**
+    logger.info("🆕 Создаем новый профиль пользователя...")
     const userData = {
       user: {
         user_full_name: contname,
@@ -198,26 +187,33 @@ ${comment ? "❗ Комментарий: " + comment : ""}`
     }
 
     try {
-      const { data: createData } = await createUser(userData)
-      logger.info("Новый профиль успешно создан:", createData)
+      const createdUser = await createUser(userData)
+
+      if (!createdUser || !createdUser.user_id) {
+        throw new Error(
+          "OmniDesk не вернул корректного ответа о создании пользователя"
+        )
+      }
+
+      logger.info(`✅ Новый профиль успешно создан: ID ${createdUser.user_id}`)
       res.sendStatus(200)
     } catch (error) {
-      logger.error("Ошибка при создании пользователя:", error.message)
+      logger.error("❌ Ошибка при создании пользователя:", error.message)
       if (error.response) {
         logger.error(
-          "Детали ошибки:",
+          "📌 Детали ошибки:",
           JSON.stringify(error.response.data, null, 2)
         )
-        logger.error("HTTP Статус ответа:", error.response.status)
+        logger.error("📌 HTTP статус:", error.response.status)
         logger.error(
-          "Заголовки ответа:",
+          "📌 Заголовки ответа:",
           JSON.stringify(error.response.headers, null, 2)
         )
       }
-      res.status(500).send("Ошибка при создании нового пользователя")
+      res.status(500).send("❌ Ошибка при создании нового пользователя")
     }
   } catch (error) {
-    logger.error("Ошибка при обработке регистрации:", error.message)
-    res.status(500).send("Внутренняя ошибка сервера")
+    logger.error("❌ Ошибка при обработке регистрации:", error.message)
+    res.status(500).send("❌ Внутренняя ошибка сервера")
   }
 }
