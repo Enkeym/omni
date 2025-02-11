@@ -4,7 +4,13 @@ import { extractTarifText } from "../utils/extractTarifText.js"
 import { createLogger } from "../utils/logger.js"
 import { sendWa } from "../utils/sendWa.js"
 
-import { createUser, deleteUsers, getUser, postCase } from "./omni.service.js"
+import {
+  createUser,
+  deleteAllCases,
+  deleteSingleUser,
+  getUser,
+  postCase
+} from "./omni.service.js"
 
 const logger = createLogger("REGISTER_SERVICE")
 
@@ -101,24 +107,14 @@ export const processRegistration = async (req, res, isTestMode) => {
     }
 
     // ✅ **Удаление старых пользователей, если найдено больше одного**
-    if (existingUsers.length > 1) {
-      logger.warn(
-        `⚠️ Найдено ${existingUsers.length} пользователей. Удаляем всех.`
-      )
-      try {
-        const deletedCount = await deleteUsers(existingUsers)
-        logger.info(`✅ Удалено пользователей: ${deletedCount}`)
-      } catch (error) {
-        logger.error("❌ Ошибка при удалении пользователей:", error.message)
+    if (existingUsers.length > 0) {
+      for (const user of existingUsers) {
+        logger.warn(
+          `⚠️ Удаляем старого пользователя ID=${user.user_id} со всеми кейсами`
+        )
+        await deleteAllCases(user.user_id)
+        await deleteSingleUser(user.user_id)
       }
-    }
-
-    // Если пользователь уже существует и остался только один, просто возвращаем его
-    if (existingUsers.length === 1) {
-      logger.warn(
-        `✅ Пользователь уже существует (ID: ${existingUsers[0].user_id}), создание не требуется.`
-      )
-      return res.sendStatus(200)
     }
 
     // 📲 **Логика отправки WhatsApp**
