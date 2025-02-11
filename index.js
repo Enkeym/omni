@@ -1,12 +1,14 @@
 import bodyParser from "body-parser"
-import dotenv from "dotenv" // Загружаем .env
+import dotenv from "dotenv"
 import express from "express"
 import helmet from "helmet"
 import morgan from "morgan"
 
-dotenv.config() // Загружаем переменные окружения
+import apiRouter from "./routes/api.route.js"
 
-const port = process.env.PORT || 3434 // Используем 3434 по умолчанию
+dotenv.config()
+
+const port = process.env.PORT || 3434
 
 const app = express()
 
@@ -22,15 +24,11 @@ app.use(bodyParser.text({ type: "*/*" }))
 // Если данные приходят в формате JSON
 app.use(express.json())
 
-import registerRouter from "./routes/register.route.js"
-import testRouter from "./routes/test.route.js"
-
 // Подключаем маршруты
-app.use("/", registerRouter)
-app.use("/", testRouter)
+app.use("/", apiRouter)
 
 //Сообщение для проверки работы сервера
-app.get("/", (req, res) => {
+app.get("/", (res) => {
   res.send("Сервер работает!")
 })
 
