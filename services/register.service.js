@@ -27,7 +27,6 @@ export const processRegistration = async (req, res, isTestMode) => {
     // Убираем префикс /register или /register-test
     dataStr = dataStr.replace(/^\/(register-test|register)\|?/, "").trim()
 
-    // Логируем после декодирования
     logger.debug("🔹 Декодированная строка данных:", dataStr)
 
     // Проверяем, начинается ли строка с "|", удаляем
@@ -36,7 +35,6 @@ export const processRegistration = async (req, res, isTestMode) => {
       logger.debug("🔹 Убрали начальный '|', новая строка данных:", dataStr)
     }
 
-    // Проверяем, пустая ли строка
     if (!dataStr) {
       logger.error("❌ Ошибка: Пустое тело запроса")
       return res.status(400).send("Пустое тело запроса")
@@ -45,10 +43,8 @@ export const processRegistration = async (req, res, isTestMode) => {
     // Разбиваем строку по "|"
     const fields = dataStr.split("|")
 
-    // Логируем полученный массив
     logger.debug("🔹 Разбитые данные (fields):", fields)
 
-    // Проверяем корректное количество полей
     if (fields.length !== 15) {
       logger.error(
         `❌ Ошибка: Неверное количество элементов: ${fields.length} вместо 15`
@@ -58,7 +54,6 @@ export const processRegistration = async (req, res, isTestMode) => {
         .send(`Неверное количество элементов: ${fields.length}`)
     }
 
-    // Деструктуризация полей
     const [
       tid,
       surname,
@@ -94,10 +89,7 @@ export const processRegistration = async (req, res, isTestMode) => {
 
     try {
       existingUsers = await getUser({ user_phone: phone, user_email: contmail })
-
-      // Фильтруем корректных пользователей
       existingUsers = existingUsers.filter((user) => user && user.user_id)
-
       logger.debug("📌 Все пользователи, найденные в OmniDesk:", existingUsers)
     } catch (error) {
       logger.error(
@@ -106,7 +98,7 @@ export const processRegistration = async (req, res, isTestMode) => {
       )
     }
 
-    // ✅ **Удаление старых пользователей, если найдено больше одного**
+    // ✅ **Удаление старых пользователей**
     if (existingUsers.length > 0) {
       for (const user of existingUsers) {
         logger.warn(
@@ -115,11 +107,32 @@ export const processRegistration = async (req, res, isTestMode) => {
         await deleteAllCases(user.user_id)
         await deleteSingleUser(user.user_id)
       }
+      // ⏳ Ожидание перед повторной проверкой
+      await new Promise((r) => setTimeout(r, 2000))
+    }
+
+    // 🔄 **Повторная проверка, удалился ли пользователь**
+    let existingUsersAfterDelete = await getUser({
+      user_phone: phone,
+      user_email: contmail
+    })
+    logger.debug(
+      "📌 Проверка пользователей после удаления:",
+      existingUsersAfterDelete
+    )
+
+    if (existingUsersAfterDelete.length > 0) {
+      logger.warn(
+        "⚠️ Повторное удаление пользователей, так как OmniDesk их не очистил"
+      )
+      for (const user of existingUsersAfterDelete) {
+        await deleteSingleUser(user.user_id)
+      }
+      await new Promise((r) => setTimeout(r, 2000))
     }
 
     // 📲 **Логика отправки WhatsApp**
     let waStatus = "не отправлена ❌"
-
     if (!isTestMode) {
       logger.info("🚀 Запускаем отправку WhatsApp...")
       try {
@@ -132,25 +145,22 @@ export const processRegistration = async (req, res, isTestMode) => {
       logger.info("🛑 Тестовый режим, WhatsApp НЕ отправляется")
     }
 
-    logger.info("📌 Статус WhatsApp уведомления:", waStatus)
-
     // 📝 **Создаём новую заявку**
     const caseData = {
       case: {
         user_email: email,
-        cc_emails: ["atsatryan@getmark.ru"],
         status: "open",
         content_type: "html",
         user_full_name: `${surname} ${firstName}`,
         subject: `Регистрация. ${company} - ${Date.now()}`,
         content: `Организация: ${company}
- Контакт: ${phone} ${contname}
- Категория: ${cat} ${role}
- Тариф: ${tarifText}
- Инструкция: ${waStatus}
- Ссылка на заявку: ${dealUrl}
- ${gs1 === "Да" ? "🌐 Регистрация в ГС1!" : ""}
- ${comment ? "❗ Комментарий: " + comment : ""}`
+Контакт: ${phone} ${contname}
+Категория: ${cat} ${role}
+Тариф: ${tarifText}
+Инструкция: ${waStatus}
+Ссылка на заявку: ${dealUrl}
+${gs1 === "Да" ? "🌐 Регистрация в ГС1!" : ""}
+${comment ? "❗ Комментарий: " + comment : ""}`
       }
     }
 
@@ -158,60 +168,51 @@ export const processRegistration = async (req, res, isTestMode) => {
       "📩 Отправляем заявку в OmniDesk:",
       JSON.stringify(caseData, null, 2)
     )
-
     try {
       const { status, data } = await postCase(caseData)
       logger.info(`✅ Заявка успешно отправлена в OmniDesk. Статус: ${status}`)
       logger.debug("📌 Ответ OmniDesk:", JSON.stringify(data, null, 2))
     } catch (error) {
       logger.error("❌ Ошибка при отправке заявки в OmniDesk:", error.message)
-      if (error.response) {
-        logger.error(
-          "📌 Детали ошибки:",
-          JSON.stringify(error.response.data, null, 2)
-        )
-        logger.error("📌 HTTP статус:", error.response.status)
-      }
     }
 
     // 🆕 **Создание нового пользователя**
     logger.info("🆕 Создаем новый профиль пользователя...")
+
+    // **Изменение email, если OmniDesk не удалил старый профиль**
+    const newEmail =
+      existingUsersAfterDelete.length > 0
+        ? `temp_${Date.now()}@mail.com`
+        : contmail
+
     const userData = {
       user: {
         user_full_name: contname,
         company_name: company,
         company_position: inn,
         user_phone: phone,
-        user_email: contmail,
+        user_email: newEmail,
         user_telegram: tg.replace("@", ""),
         user_note: tarifText
       }
     }
 
+    logger.debug(
+      "📌 Данные перед созданием пользователя:",
+      JSON.stringify(userData, null, 2)
+    )
+
     try {
       const createdUser = await createUser(userData)
-
       if (!createdUser || !createdUser.user_id) {
         throw new Error(
           "OmniDesk не вернул корректного ответа о создании пользователя"
         )
       }
-
       logger.info(`✅ Новый профиль успешно создан: ID ${createdUser.user_id}`)
       res.sendStatus(200)
     } catch (error) {
       logger.error("❌ Ошибка при создании пользователя:", error.message)
-      if (error.response) {
-        logger.error(
-          "📌 Детали ошибки:",
-          JSON.stringify(error.response.data, null, 2)
-        )
-        logger.error("📌 HTTP статус:", error.response.status)
-        logger.error(
-          "📌 Заголовки ответа:",
-          JSON.stringify(error.response.headers, null, 2)
-        )
-      }
       res.status(500).send("❌ Ошибка при создании нового пользователя")
     }
   } catch (error) {
