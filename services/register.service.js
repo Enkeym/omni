@@ -81,7 +81,10 @@ export const processRegistration = async (req, res, isTestMode) => {
     logger.debug("🔹 phone:", phone)
 
     const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
-    let tarifText = cleanOmniNotes(extractTarifText(tarif))
+
+    logger.debug("📌 Исходный тариф перед обработкой:", tarif)
+    const tarifText = cleanOmniNotes(extractTarifText(tarif))
+    logger.debug("📌 Обработанный тариф:", tarifText)
 
     // 🔍 **Поиск существующих пользователей**
     logger.info("🔍 Получение данных пользователя по телефону и email...")

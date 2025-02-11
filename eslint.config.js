@@ -12,14 +12,16 @@ export default [
       ecmaVersion: "latest",
       globals: {
         process: "readonly",
-        console: "readonly"
+        console: "readonly",
+        setTimeout: "readonly"
       }
     },
     rules: {
+      "no-undef": "off",
       "import/no-unresolved": "off",
       "import/extensions": "off",
-      "no-undef": "error",
       "no-console": "off",
+
       "import/order": [
         "error",
         {

@@ -4,9 +4,14 @@
  * @param {string} text - Исходная строка.
  * @returns {string} Очищенная строка.
  */
+/**
+ * Очищает текст от OmniDesk тегов и удаляет лишний заголовок "ТоварСумма".
+ * @param {string} text - Исходная строка.
+ * @returns {string} Очищенная строка.
+ */
 export const cleanOmniNotes = (text) => {
   return text
     .replace(/\[\/?(table|tr|th|td)\]/g, "")
-    .replace(/^Товар\s*Сумма\s*/i, "")
+    .replace(/^\s*Товар\s*Сумма\s*/gim, "")
     .trim()
 }
