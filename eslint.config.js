@@ -17,7 +17,7 @@ export default [
       }
     },
     rules: {
-      "no-undef": "off",
+      "no-undef": "error",
       "import/no-unresolved": "off",
       "import/extensions": "off",
       "no-console": "off",
