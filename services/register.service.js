@@ -119,6 +119,7 @@ export const processRegistration = async (req, res, isTestMode) => {
       user_phone: phone,
       user_email: contmail
     })
+
     logger.debug(
       "📌 Проверка пользователей после удаления:",
       existingUsersAfterDelete
@@ -129,6 +130,7 @@ export const processRegistration = async (req, res, isTestMode) => {
         "⚠️ Повторное удаление пользователей, так как OmniDesk их не очистил"
       )
       for (const user of existingUsersAfterDelete) {
+        await deleteAllCases(user.user_id)
         await deleteSingleUser(user.user_id)
       }
       await new Promise((r) => setTimeout(r, 2000))
