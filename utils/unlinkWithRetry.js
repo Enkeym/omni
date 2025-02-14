@@ -6,7 +6,7 @@ export async function unlinkWithRetry(
   body,
   config,
   retries = 5,
-  delay = 5000
+  delay = 10000
 ) {
   let attempt = 0
 

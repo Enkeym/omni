@@ -13,8 +13,6 @@ export const processRegistration = async (req, res, isTestMode) => {
   try {
     const data = parseRequest(req.path)
 
-    console.log(JSON.stringify(data, null, 2))
-
     //Поиск пользователей
     let existingUsers = []
 

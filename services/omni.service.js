@@ -15,6 +15,12 @@ export const getUser = async (params) => {
   return Object.values(response.data).map((objUser) => objUser.user)
 }
 
+export const getUserById = async (userId) => {
+  const url = `${omnideskUrl}/api/users/${userId}.json`
+  const response = await axios.get(url, { headers, auth })
+  return response.data.user
+}
+
 export const deleteUser = async (userId) => {
   if (!userId) {
     throw new Error("Нет userId для удаления")
