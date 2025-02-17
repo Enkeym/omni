@@ -1,4 +1,3 @@
-// services/register.service.js
 import { parseRequest } from "../utils/parseRequest.js"
 import { sendWa } from "../utils/sendWa.js"
 
@@ -24,25 +23,97 @@ export const processRegistration = async (req, res, isTestMode) => {
         user_email: data.contmail
       })
     } catch (error) {
-      console.error(`ошибка: ${error}`)
+      console.error("Ошибка при поиске пользователя:", error)
       throw new Error(`Ошибка на сервере: ${error.message}`)
     }
 
-    //Отправка в WatsApp
-    let waStatus = "Не отправляется"
+    let mainUser = null
+    if (existingUsers.length > 0) {
+      mainUser = existingUsers[0]
+      const duplicates = existingUsers.slice(1)
 
+      if (duplicates.length > 0) {
+        for await (const dup of duplicates) {
+          try {
+            console.log(`Удаляем дубликат: user_id=${dup.user_id}`)
+            await unlinkAllLinkedUsers(dup?.user_id)
+            await deleteUser(dup?.user_id)
+          } catch (err) {
+            console.error("Ошибка удаления дубликата:", err.message)
+          }
+        }
+      }
+    }
+
+    const userData = {
+      user: {
+        user_full_name: data.contname,
+        company_name: data.company,
+        company_position: data.inn,
+        user_phone: data.phone,
+        user_email: data.contmail,
+        user_telegram: data.tg.replace("@", ""),
+        user_note: data.cleanNotes
+      }
+    }
+
+    try {
+      if (!mainUser) {
+        console.log("Пользователь не найден, создаём нового...")
+        mainUser = await createUser(userData)
+        console.log("Новый пользователь создан:", mainUser.user_id)
+      } else {
+        console.log(
+          `Обновляем «главного» пользователя ID=${mainUser.user_id}...`
+        )
+        mainUser = await editUser(mainUser.user_id, userData)
+        console.log("Пользователь обновлён:", mainUser.user_id)
+      }
+    } catch (err) {
+      if (err.message.includes("email_already_exists")) {
+        console.error(
+          "Ошибка: этот email уже привязан к другому пользователю. Ищем существующего..."
+        )
+
+        let existingEmailUser = []
+        try {
+          existingEmailUser = await getUser({ user_email: data.contmail })
+        } catch (findError) {
+          console.error(
+            "Не удалось найти пользователя по email:",
+            findError.message
+          )
+        }
+
+        if (existingEmailUser.length) {
+          console.log(
+            "Найден существующий пользователь:",
+            existingEmailUser[0].user_id
+          )
+          mainUser = existingEmailUser[0]
+        } else {
+          console.warn(
+            "Пользователь с таким email не найден. Возможно, ошибка в API."
+          )
+        }
+      } else {
+        console.error(
+          "Ошибка при создании/обновлении пользователя:",
+          err.message
+        )
+      }
+    }
+
+    let waStatus = "Не отправляется"
     if (!isTestMode) {
-      console.info("Начинаем отправку в WatsApp...")
+      console.info("Начинаем отправку в WhatsApp...")
       try {
         waStatus = await sendWa(data.phone)
       } catch (error) {
         console.error("Ошибка при отправке WhatsApp:", error.message)
       }
-    } else {
-      console.info("Тестовый режим, WhatsApp НЕ отправляется!")
     }
 
-    //Создание заявки
     const caseData = {
       case: {
         user_email: data.email,
@@ -61,97 +132,12 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
       }
     }
 
-    //Логирование заявки
-    console.log("Создана заявка:", JSON.stringify(caseData, null, 2))
-
-    //Отправка заявки в OmniDesk
+    console.log("Создаём заявку...", JSON.stringify(caseData, null, 2))
     try {
       const newCase = await createCase(caseData)
       console.log("Заявка успешно создана:", newCase)
-    } catch (error) {
-      console.log("Ошибка при создании заявки:", error.message)
-    }
-
-    const userData = {
-      user: {
-        user_full_name: data.contname,
-        company_name: data.company,
-        company_position: data.inn,
-        user_phone: data.phone,
-        user_email: data.contmail,
-        user_telegram: data.tg.replace("@", ""),
-        user_note: data.cleanNotes
-      }
-    }
-
-    // Создание нового пользователя
-    if (existingUsers.length === 0) {
-      console.log("Пользователя не найдено, создаём нового...")
-
-      try {
-        const newUser = await createUser(userData)
-        console.log(
-          `Новый пользователь создан: ID ${newUser.user_id}`,
-          JSON.stringify(newUser, null, 2)
-        )
-      } catch (error) {
-        console.log("Ошибка при создании пользователя:", error.message)
-      }
-    } else {
-      console.log(`Найдено пользователей: ${existingUsers.length}`)
-
-      let mainUser = existingUsers[0]
-      const duplicates = existingUsers.slice(1)
-
-      // Удаляем дубликаты
-      if (duplicates.length > 0) {
-        for await (const dupUSer of duplicates) {
-          try {
-            console.log(`Удаляем дубликат: user_id=${dupUSer.user_id}`)
-            await unlinkAllLinkedUsers(dupUSer?.user_id)
-            await deleteUser(dupUSer?.user_id)
-          } catch (error) {
-            console.error("Ошибка удаления дубликата:", error.message)
-          }
-        }
-      }
-
-      // Проверка на существующего юзера
-      try {
-        const updatedUser = await editUser(mainUser.user_id, userData)
-        console.log(
-          `Пользователь обновлен: ID(${updatedUser.user_id}):`,
-          JSON.stringify(updatedUser, null, 2)
-        )
-      } catch (error) {
-        if (error.message.includes("email_already_exists")) {
-          console.error(
-            "Ошибка: этот email уже привязан к другому пользователю. Ищем существующего..."
-          )
-          let existingEmailUser
-          try {
-            existingEmailUser = await getUser({ user_email: data.contmail })
-          } catch (findError) {
-            console.error(
-              "Не удалось найти пользователя по email:",
-              findError.message
-            )
-          }
-
-          if (existingEmailUser?.length) {
-            console.log(
-              `Найден существующий пользователь с таким email: ${existingEmailUser[0].user_id}`
-            )
-            mainUser = existingEmailUser[0]
-          } else {
-            console.warn(
-              "Пользователь с таким email не найден. Возможно, ошибка в API."
-            )
-          }
-        } else {
-          console.error("Ошибка при обновлении пользователя:", error.message)
-        }
-      }
+    } catch (err) {
+      console.error("Ошибка при создании заявки:", err.message)
     }
 
     res.sendStatus(200)
@@ -165,10 +151,10 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
       console.error("Ошибка валидации:", error.message)
       return res.status(400).json({ error: error.message })
     }
-
-    console.error(`Ошибка: ${error.message}`)
-    return res
-      .status(500)
-      .json({ error: "Ошибка на сервере", details: error.message })
+    console.error("Ошибка:", error.message)
+    return res.status(500).json({
+      error: "Ошибка на сервере",
+      details: error.message
+    })
   }
 }

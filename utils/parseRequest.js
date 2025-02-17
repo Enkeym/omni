@@ -60,7 +60,7 @@ export const parseRequest = (path) => {
   const cleanTarif =
     tarif
       .replace(/\[\/?(?:table|tr|th|td)\]/g, "")
-      .match(/тариф\s«?([^»]+)»?/i)?.[1] || null
+      .match(/тариф\s+(.*)$/i)?.[1] || null
   const cleanNotes = tarif
     .replace(/\[\/?(?:table|tr|th|td)\]/g, "")
     .replace(/^\s*Товар\s*Сумма\s*/gim, "")
