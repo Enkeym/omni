@@ -1,3 +1,4 @@
+// utils/parseRequest.js
 import { bitrixUrl } from "../config.js"
 
 export const parseRequest = (path) => {

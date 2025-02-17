@@ -19,7 +19,7 @@ export const text2 = `⚠️ В ответном сообщении укажит
 @help_getmark_bot
 
 Ссылки на программы, необходимые для регистрации:
-https://getmark.omnidesk.ru/knowledge_base/31971 
+https://getmark.omnidesk.ru/knowledge_base/31971
 
 
 

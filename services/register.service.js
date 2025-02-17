@@ -1,3 +1,4 @@
+// services/register.service.js
 import { parseRequest } from "../utils/parseRequest.js"
 import { sendWa } from "../utils/sendWa.js"
 
@@ -5,6 +6,7 @@ import {
   createCase,
   createUser,
   deleteUser,
+  editUser,
   getUser,
   unlinkAllLinkedUsers
 } from "./omni.service.js"
@@ -24,18 +26,6 @@ export const processRegistration = async (req, res, isTestMode) => {
     } catch (error) {
       console.error(`ошибка: ${error}`)
       throw new Error(`Ошибка на сервере: ${error.message}`)
-    }
-
-    //Удаление пользователей
-    if (existingUsers.length > 0) {
-      for await (const user of existingUsers) {
-        try {
-          await unlinkAllLinkedUsers(user?.user_id)
-          await deleteUser(user?.user_id)
-        } catch (error) {
-          console.error(`Ошибка удаления: ${error.message}`)
-        }
-      }
     }
 
     //Отправка в WatsApp
@@ -82,7 +72,6 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
       console.log("Ошибка при создании заявки:", error.message)
     }
 
-    //Создание нового пользователя
     const userData = {
       user: {
         user_full_name: data.contname,
@@ -95,14 +84,47 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
       }
     }
 
-    //Логирование пользователя
-    console.log("Создан пользователь:", JSON.stringify(userData, null, 2))
+    // Создание нового пользователя
+    if (existingUsers.length === 0) {
+      console.log("Пользователя не найдено, создаём нового...")
 
-    try {
-      const newUser = await createUser(userData)
-      console.log(`Новый пользователь создан: ID ${newUser.user_id}`)
-    } catch (error) {
-      console.log("Ошибка при создании пользователя:", error.message)
+      try {
+        const newUser = await createUser(userData)
+        console.log(
+          `Новый пользователь создан: ID ${newUser.user_id}`,
+          JSON.stringify(newUser, null, 2)
+        )
+      } catch (error) {
+        console.log("Ошибка при создании пользователя:", error.message)
+      }
+    } else {
+      console.log(`Найдено пользователей: ${existingUsers.length}`)
+
+      const mainUser = existingUsers[0]
+      const duplicates = existingUsers.slice(1)
+
+      // Удаляем дубликаты
+      if (duplicates.length > 0) {
+        for await (const dupUSer of duplicates) {
+          try {
+            console.log(`Удаляем дубликат: user_id=${dupUSer.user_id}`)
+            await unlinkAllLinkedUsers(dupUSer?.user_id)
+            await deleteUser(dupUSer?.user_id)
+          } catch (error) {
+            console.error("Ошибка удаления дубликата:", error.message)
+          }
+        }
+      }
+
+      try {
+        const updatedUser = await editUser(mainUser.user_id, userData)
+        console.log(
+          `пользователь обновлен: ID(${updatedUser.user_id}):`,
+          JSON.stringify(updatedUser, null, 2)
+        )
+      } catch (error) {
+        console.error("Ошибка при обновлении пользователя:", error.message)
+      }
     }
 
     res.sendStatus(200)

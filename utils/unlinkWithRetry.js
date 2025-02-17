@@ -1,31 +1,30 @@
+// utils/unlinkWithRetry.js
 import axios from "axios"
 
-// Пример: делаем 1 повтор через 5 секунд, если первый запрос упал
 export async function unlinkWithRetry(
   url,
   body,
   config,
-  retries = 5,
-  delay = 10000
+  maxRetries = 5,
+  baseDelay = 10000
 ) {
   let attempt = 0
-
   while (true) {
     try {
       return await axios.put(url, body, config)
     } catch (error) {
-      if (attempt >= retries) {
+      if (attempt >= maxRetries) {
         throw error
       }
-
-      console.warn(
-        `Попытка №${attempt + 1} не удалась (${error.message}). ` +
-          `Ждём ${delay / 1000} секунд и повторяем...`
-      )
-
-      await new Promise((resolve) => setTimeout(resolve, delay))
-
       attempt++
+
+      const delayMs = baseDelay * Math.pow(2, attempt - 1)
+      console.warn(
+        `Попытка №${attempt} не удалась (${error.message}). Ждём ${
+          delayMs / 1000
+        } секунд и повторяем...`
+      )
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
   }
 }

@@ -1,3 +1,4 @@
+//utils/sendWa.js
 import axios from "axios"
 
 import { wazzupChannelId, wazzupToken, wazzupUrl } from "../config.js"
@@ -16,41 +17,39 @@ const createMessagePayload = (phone, text) => ({
   text
 })
 
-/**
- * Отправляет два сообщения через WhatsApp.
- * @param {string} phone - Номер телефона для отправки сообщения.
- * @returns {Promise<string>} Статус отправки сообщений.
- */
+// Отправляет два сообщения через WatsApp
 export const sendWa = async (phone) => {
-  const sanitizedPhone = phone.replace(/\D/g, "") // Удаляем все нецифровые символы
+  const sanitizedPhone = phone.replace(/\D/g, "")
   console.log(`📲 Отправка сообщений в WhatsApp на номер: ${sanitizedPhone}`)
 
-  // Формируем сообщения
-  const messages = [
-    createMessagePayload(sanitizedPhone, text1),
-    createMessagePayload(sanitizedPhone, text2)
-  ]
+  const message1 = createMessagePayload(sanitizedPhone, text1)
+  const message2 = createMessagePayload(sanitizedPhone, text2)
 
   try {
     console.log("🚀 Начинаем отправку сообщений через Wazzup...")
 
-    // Отправляем все сообщения параллельно
-    const responses = await Promise.all(
-      messages.map((msg) => axios.post(wazzupUrl, msg, { headers }))
-    )
-
-    // Проверяем, все ли сообщения успешно отправлены
-    const allSuccessful = responses.every(
-      (res) => res.status === 201 || res.status === 200
-    )
-
-    if (allSuccessful) {
-      console.log("✅ Все сообщения успешно отправлены в WhatsApp.")
-      return "отправлена ✔️"
-    } else {
-      console.warn("⚠️ Не все сообщения были отправлены успешно.")
+    const response1 = await axios.post(wazzupUrl, message1, { headers })
+    if (response1.status !== 201 && response1.status !== 200) {
+      console.warn(
+        "Первое сообщение не отправлено:",
+        response1.status,
+        response1.statusText
+      )
       return "не отправлена ❌"
     }
+
+    const response2 = await axios.post(wazzupUrl, message2, { headers })
+    if (response2.status !== 201 && response2.status !== 200) {
+      console.warn(
+        "Второе сообщение не отправлено:",
+        response2.status,
+        response2.statusText
+      )
+      return "не отправлена ❌"
+    }
+
+    console.log("✅ Оба сообщения успешно отправлены в WhatsApp.")
+    return "отправлена ✔️"
   } catch (error) {
     console.error("❌ Ошибка при отправке сообщений WhatsApp:", error.message)
 

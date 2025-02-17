@@ -1,3 +1,4 @@
+// services/omni.service.js
 import axios from "axios"
 
 import { omnideskApiKey, omnideskEmail, omnideskUrl } from "../config.js"
@@ -52,60 +53,6 @@ export const deleteUser = async (userId) => {
   }
 }
 
-export const unlinkAllLinkedUsers = async (userId) => {
-  if (!userId) {
-    throw new Error("Не передан userId для отвязки связанных пользователей")
-  }
-
-  try {
-    const getUrl = `${omnideskUrl}/api/users/${userId}.json`
-    const getResponse = await axios.get(getUrl, { headers, auth })
-    const user = getResponse.data.user
-
-    if (!user) {
-      console.warn(`Пользователь с ID ${userId} не найден`)
-      return
-    }
-
-    if (!Array.isArray(user.linked_users) || user.linked_users.length === 0) {
-      console.log(`У пользователя ${userId} нет связанных профилей.`)
-      return
-    }
-
-    console.log(
-      `Найдено ${user.linked_users.length} связанных пользователей. Начинаем отвязку...`
-    )
-
-    await Promise.all(
-      user.linked_users.map(async (linkedUserId) => {
-        const unlinkUrl = `${omnideskUrl}/api/users/${userId}/unlink.json`
-        const body = { user_id: linkedUserId }
-        console.log(`Отправка PUT-запроса для отвязки user_id=${linkedUserId}`)
-
-        const unlinkResponse = await unlinkWithRetry(unlinkUrl, body, {
-          headers,
-          auth
-        })
-
-        console.log(
-          `Пользователь ${linkedUserId} успешно отвязан от ${userId}. `,
-          unlinkResponse.data
-        )
-      })
-    )
-
-    console.log(
-      `Все связанные пользователи (${user.linked_users.length} шт.) отвязаны от ${userId}.`
-    )
-  } catch (error) {
-    console.error(
-      `Ошибка при отвязке пользователей от ${userId}:`,
-      error.response?.data || error.message
-    )
-    throw error
-  }
-}
-
 export const createCase = async (caseData) => {
   if (!caseData) {
     throw new Error("Некорректные данные:", caseData)
@@ -141,5 +88,78 @@ export const createUser = async (userData) => {
         error.response?.data?.error || error.message
       }`
     )
+  }
+}
+
+export const editUser = async (userId, userData) => {
+  if (!userId) {
+    throw new Error("Не передан userId для редактирования")
+  }
+
+  if (!userData) {
+    throw new Error("Нет данных для редактирования пользователя")
+  }
+
+  try {
+    const url = `${omnideskUrl}/api/users/${userId}.json`
+    const response = await axios.put(url, userData, { headers, auth })
+    return response.data.user
+  } catch (error) {
+    console.log("Ошибка при редактировании пользователя:", error.message)
+    throw new Error(
+      `Ошибка при редактировании пользователя: ${
+        error.response?.data?.error || error.message
+      }`
+    )
+  }
+}
+
+export const unlinkAllLinkedUsers = async (userId) => {
+  if (!userId) {
+    throw new Error("Не передан userId для отвязки связанных пользователей")
+  }
+
+  try {
+    const getUrl = `${omnideskUrl}/api/users/${userId}.json`
+    const getResponse = await axios.get(getUrl, { headers, auth })
+    const user = getResponse.data.user
+
+    if (!user) {
+      console.warn(`Пользователь с ID ${userId} не найден`)
+      return
+    }
+
+    if (!Array.isArray(user.linked_users) || user.linked_users.length === 0) {
+      console.log(`У пользователя ${userId} нет связанных профилей.`)
+      return
+    }
+
+    console.log(
+      `Найдено ${user.linked_users.length} связанных пользователей. Начинаем отвязку...`
+    )
+
+    for await (const linkedUserId of user.linked_users) {
+      const unlinkUrl = `${omnideskUrl}/api/users/${userId}/unlink.json`
+      const body = { user_id: linkedUserId }
+      console.log(`Отправка PUT-запроса для отвязки user_id=${linkedUserId}`)
+      const unlinkResponse = await unlinkWithRetry(unlinkUrl, body, {
+        headers,
+        auth
+      })
+      console.log(
+        `Пользователь ${linkedUserId} успешно отвязан от ${userId}.`,
+        unlinkResponse.data
+      )
+    }
+
+    console.log(
+      `Все связанные пользователи (${user.linked_users.length} шт.) отвязаны от ${userId}.`
+    )
+  } catch (error) {
+    console.error(
+      `Ошибка при отвязке пользователей от ${userId}:`,
+      error.response?.data || error.message
+    )
+    throw error
   }
 }
