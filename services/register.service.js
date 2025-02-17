@@ -15,6 +15,7 @@ export const processRegistration = async (req, res, isTestMode) => {
 
     //Поиск пользователей
     let existingUsers = []
+    existingUsers = existingUsers.filter((usr) => usr && usr.user_id)
 
     try {
       existingUsers = await getUser({
@@ -33,10 +34,13 @@ export const processRegistration = async (req, res, isTestMode) => {
 
       if (duplicates.length > 0) {
         for await (const dup of duplicates) {
+          if (!dup?.user_id) {
+            console.warn("Пропускаем дубликат без user_id:", dup)
+            continue
+          }
           try {
             console.log(`Удаляем дубликат: user_id=${dup.user_id}`)
-            await unlinkAllLinkedUsers(dup?.user_id)
-            //await deleteUser(dup?.user_id)
+            await unlinkAllLinkedUsers(dup.user_id)
           } catch (err) {
             console.error("Ошибка удаления дубликата:", err.message)
           }
