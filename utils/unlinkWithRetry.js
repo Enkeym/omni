@@ -6,24 +6,39 @@ export async function unlinkWithRetry(
   body,
   config,
   maxRetries = 5,
-  baseDelay = 10000
+  fallbackBaseDelay = 10000
 ) {
   let attempt = 0
+
   while (true) {
     try {
       return await axios.put(url, body, config)
     } catch (error) {
-      if (attempt >= maxRetries) {
+      attempt++
+      const isTooManyRequests = error?.response?.status === 429
+
+      if (attempt > maxRetries) {
         throw error
       }
-      attempt++
 
-      const delayMs = baseDelay * Math.pow(2, attempt - 1)
-      console.warn(
-        `Попытка №${attempt} не удалась (${error.message}). Ждём ${
-          delayMs / 1000
-        } секунд и повторяем...`
-      )
+      let delayMs = 0
+
+      if (isTooManyRequests) {
+        const retryHeader = error.response.headers["retry_after"] || "20"
+        const retryAfterSec = parseInt(retryHeader, 10) || 20
+        delayMs = retryAfterSec * 1000
+        console.warn(
+          `Попытка №${attempt}. Сервер вернул 429: Too Many Requests. Ждём ${retryAfterSec} сек. и повторяем...`
+        )
+      } else {
+        delayMs = fallbackBaseDelay * Math.pow(2, attempt - 1)
+        console.warn(
+          `Попытка №${attempt}. Ошибка: ${error.message}. Ждём ${
+            delayMs / 1000
+          } сек. и повторяем...`
+        )
+      }
+
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
   }
