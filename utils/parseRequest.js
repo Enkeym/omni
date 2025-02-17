@@ -57,7 +57,10 @@ export const parseRequest = (path) => {
   }
 
   const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
-  const cleanTarif = tarif.match(/тариф\s«([^»]+)»/)?.[1] || null
+  const cleanTarif =
+    tarif
+      .replace(/\[\/?(?:table|tr|th|td)\]/g, "")
+      .match(/тариф\s«?([^»]+)»?/i)?.[1] || null
   const cleanNotes = tarif
     .replace(/\[\/?(?:table|tr|th|td)\]/g, "")
     .replace(/^\s*Товар\s*Сумма\s*/gim, "")

@@ -100,7 +100,7 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
     } else {
       console.log(`Найдено пользователей: ${existingUsers.length}`)
 
-      const mainUser = existingUsers[0]
+      let mainUser = existingUsers[0]
       const duplicates = existingUsers.slice(1)
 
       // Удаляем дубликаты
@@ -109,21 +109,48 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
           try {
             console.log(`Удаляем дубликат: user_id=${dupUSer.user_id}`)
             await unlinkAllLinkedUsers(dupUSer?.user_id)
-            await deleteUser(dupUSer.user_id)
+            await deleteUser(dupUSer?.user_id)
           } catch (error) {
             console.error("Ошибка удаления дубликата:", error.message)
           }
         }
       }
 
+      // Проверка на существующего юзера
       try {
         const updatedUser = await editUser(mainUser.user_id, userData)
         console.log(
-          `пользователь обновлен: ID(${updatedUser.user_id}):`,
+          `Пользователь обновлен: ID(${updatedUser.user_id}):`,
           JSON.stringify(updatedUser, null, 2)
         )
       } catch (error) {
-        console.error("Ошибка при обновлении пользователя:", error.message)
+        if (error.message.includes("email_already_exists")) {
+          console.error(
+            "Ошибка: этот email уже привязан к другому пользователю. Ищем существующего..."
+          )
+          let existingEmailUser
+          try {
+            existingEmailUser = await getUser({ user_email: data.contmail })
+          } catch (findError) {
+            console.error(
+              "Не удалось найти пользователя по email:",
+              findError.message
+            )
+          }
+
+          if (existingEmailUser?.length) {
+            console.log(
+              `Найден существующий пользователь с таким email: ${existingEmailUser[0].user_id}`
+            )
+            mainUser = existingEmailUser[0]
+          } else {
+            console.warn(
+              "Пользователь с таким email не найден. Возможно, ошибка в API."
+            )
+          }
+        } else {
+          console.error("Ошибка при обновлении пользователя:", error.message)
+        }
       }
     }
 
