@@ -1,6 +1,16 @@
 // utils/parseRequest.js
 import { bitrixUrl } from "../config.js"
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function isValidPhone(phone) {
+  if (!phone) return false
+  const cleaned = phone.replace(/\D/g, "")
+  return cleaned.length >= 10 && cleaned.length <= 14
+}
+
 export const parseRequest = (path) => {
   let data = decodeURIComponent(path)
   data = data
@@ -37,6 +47,14 @@ export const parseRequest = (path) => {
     comment,
     gs1
   ] = fields
+
+  if (!isValidPhone(phone)) {
+    throw new Error(`Некорректный телефон: "${phone}"`)
+  }
+
+  if (!isValidEmail(contmail)) {
+    throw new Error(`Некорректный e-mail: "${contmail}"`)
+  }
 
   const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
   const cleanTarif = tarif.match(/тариф\s«([^»]+)»/)?.[1] || null

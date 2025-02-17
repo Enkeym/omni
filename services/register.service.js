@@ -109,7 +109,7 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
           try {
             console.log(`Удаляем дубликат: user_id=${dupUSer.user_id}`)
             await unlinkAllLinkedUsers(dupUSer?.user_id)
-            await deleteUser(dupUSer?.user_id)
+            await deleteUser(dupUSer.user_id)
           } catch (error) {
             console.error("Ошибка удаления дубликата:", error.message)
           }
@@ -129,7 +129,19 @@ ${data.comment ? "❗ Комментарий: " + data.comment : ""}`
 
     res.sendStatus(200)
   } catch (error) {
+    if (
+      error.message.startsWith("Некорректный телефон") ||
+      error.message.startsWith("Некорректный e-mail") ||
+      error.message.startsWith("Неверное число элементов") ||
+      error.message.includes("Пустое тело запроса")
+    ) {
+      console.error("Ошибка валидации:", error.message)
+      return res.status(400).json({ error: error.message })
+    }
+
     console.error(`Ошибка: ${error.message}`)
-    res.status(500).json({ error: "Ошибка на сервере", details: error.message })
+    return res
+      .status(500)
+      .json({ error: "Ошибка на сервере", details: error.message })
   }
 }
