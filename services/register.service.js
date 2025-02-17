@@ -4,7 +4,6 @@ import { sendWa } from "../utils/sendWa.js"
 import {
   createCase,
   createUser,
-  deleteUser,
   editUser,
   getUser,
   unlinkAllLinkedUsers
@@ -37,7 +36,7 @@ export const processRegistration = async (req, res, isTestMode) => {
           try {
             console.log(`Удаляем дубликат: user_id=${dup.user_id}`)
             await unlinkAllLinkedUsers(dup?.user_id)
-            await deleteUser(dup?.user_id)
+            //await deleteUser(dup?.user_id)
           } catch (err) {
             console.error("Ошибка удаления дубликата:", err.message)
           }
