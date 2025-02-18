@@ -22,37 +22,6 @@ export const getUserById = async (userId) => {
   return response.data.user
 }
 
-export const deleteUser = async (userId) => {
-  if (!userId) {
-    throw new Error("Нет userId для удаления")
-  }
-
-  try {
-    const url = `${omnideskUrl}/api/users/${userId}.json`
-    console.log(`Отправка DELETE запроса на ${url}`)
-
-    const response = await axios.delete(url, { headers, auth })
-
-    console.log("Ответ от сервера:", JSON.stringify(response.data, null, 2))
-    return response.data.user || {}
-  } catch (error) {
-    console.error(
-      ` Ошибка при удалении пользователя ${userId}: ${error.message}`
-    )
-
-    if (error.response) {
-      console.error(
-        "Детали ошибки:",
-        JSON.stringify(error.response.data, null, 2)
-      )
-    }
-
-    throw new Error(
-      `Ошибка при удалении: ${error.response?.data?.error || error.message}`
-    )
-  }
-}
-
 export const createCase = async (caseData) => {
   if (!caseData) {
     throw new Error("Некорректные данные:", caseData)
