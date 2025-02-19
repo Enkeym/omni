@@ -54,7 +54,7 @@ export const processRegistration = async (req, res, isTestMode) => {
         company_name: data.company,
         company_position: data.inn,
         user_phone: data.phone,
-        user_email: data.contmail,
+        /* user_email: data.contmail, */
         user_telegram: data.tg.replace("@", ""),
         user_note: data.cleanNotes
       }
