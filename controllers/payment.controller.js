@@ -19,8 +19,8 @@ export const payment = async (req, res) => {
 
     try {
       existingUsers = await getUser({
-        user_phone: data.phone,
-        user_email: data.contmail
+        user_phone: data.phone
+        /* user_email: data.contmail */
       })
     } catch (error) {
       console.error("Ошибка при поиске пользователя:", error)
@@ -56,7 +56,7 @@ export const payment = async (req, res) => {
         company_name: data.company,
         company_position: data.inn,
         user_phone: data.phone,
-        user_email: data.contmail,
+        /* user_email: data.contmail, */
         user_telegram: data.tg.replace("@", ""),
         user_note: data.cleanNotes
       }
