@@ -19,8 +19,8 @@ export const processRegistration = async (req, res, isTestMode) => {
 
     try {
       existingUsers = await getUser({
-        user_phone: data.phone,
-        user_email: data.contmail
+        user_phone: data.phone
+        /* user_email: data.contmail */
       })
     } catch (error) {
       console.error("Ошибка при поиске пользователя:", error)
