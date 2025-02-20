@@ -48,17 +48,6 @@ export const parseRequest = (path) => {
     gs1
   ] = fields
 
-  const dateObj = new Date()
-  const paymentDate = dateObj.toLocaleString("ru-RU", {
-    timeZone: "Europe/Moscow",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  })
-
   if (!isValidPhone(phone)) {
     throw new Error(`Некорректный телефон: "${phone}"`)
   }
@@ -94,7 +83,6 @@ export const parseRequest = (path) => {
     comment,
     gs1,
     cleanNotes,
-    dealUrl,
-    paymentDate
+    dealUrl
   }
 }
