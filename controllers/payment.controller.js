@@ -4,7 +4,7 @@ export const payment = (req, res) => {
   return processFlow(req, res, {
     isTestMode: false,
     subjectPrefix: "Продление",
-    contentPrefix: "Дата продления",
+    contentPrefix: "Оплата успешно прошла ! WatsApp сообщение ",
     sendWhatsApp: false
   })
 }

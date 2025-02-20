@@ -14,6 +14,6 @@ export const registerTest = (req, res) => {
     isTestMode: true,
     subjectPrefix: "Регистрация (тест)",
     contentPrefix: "Инструкция",
-    sendWhatsApp: true
+    sendWhatsApp: false
   })
 }
