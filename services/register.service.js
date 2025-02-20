@@ -1,227 +1,163 @@
-import { bitrixUrl } from "../config.js"
-import { cleanOmniNotes } from "../utils/cleanOmniNotes.js"
-import { extractTarifText } from "../utils/extractTarifText.js"
-import { createLogger } from "../utils/logger.js"
+import { parseRequest } from "../utils/parseRequest.js"
 import { sendWa } from "../utils/sendWa.js"
 
 import {
+  createCase,
   createUser,
-  deleteAllCases,
-  deleteSingleUser,
+  editUser,
   getUser,
-  postCase
+  unlinkAllLinkedUsers
 } from "./omni.service.js"
-
-const logger = createLogger("REGISTER_SERVICE")
 
 export const processRegistration = async (req, res, isTestMode) => {
   try {
-    logger.info("🔹 Начало обработки запроса регистрации")
+    const data = parseRequest(req.path)
 
-    // Выводим URL запроса перед обработкой
-    logger.debug("🔹 Исходный URL запроса:", req.originalUrl)
-
-    // Декодируем URL
-    let dataStr = decodeURIComponent(req.originalUrl)
-
-    // Убираем префикс /register или /register-test
-    dataStr = dataStr.replace(/^\/(register-test|register)\|?/, "").trim()
-
-    logger.debug("🔹 Декодированная строка данных:", dataStr)
-
-    // Проверяем, начинается ли строка с "|", удаляем
-    if (dataStr.startsWith("|")) {
-      dataStr = dataStr.slice(1)
-      logger.debug("🔹 Убрали начальный '|', новая строка данных:", dataStr)
-    }
-
-    if (!dataStr) {
-      logger.error("❌ Ошибка: Пустое тело запроса")
-      return res.status(400).send("Пустое тело запроса")
-    }
-
-    // Разбиваем строку по "|"
-    const fields = dataStr.split("|")
-
-    logger.debug("🔹 Разбитые данные (fields):", fields)
-
-    if (fields.length !== 15) {
-      logger.error(
-        `❌ Ошибка: Неверное количество элементов: ${fields.length} вместо 15`
-      )
-      return res
-        .status(400)
-        .send(`Неверное количество элементов: ${fields.length}`)
-    }
-
-    const [
-      tid,
-      surname,
-      firstName,
-      email,
-      company,
-      contname,
-      phone,
-      inn,
-      contmail,
-      tg,
-      cat,
-      role,
-      tarif,
-      comment,
-      gs1
-    ] = fields
-
-    logger.info("✅ Поля запроса успешно разобраны")
-    logger.debug("🔹 tid:", tid)
-    logger.debug("🔹 surname:", surname)
-    logger.debug("🔹 firstName:", firstName)
-    logger.debug("🔹 email:", email)
-    logger.debug("🔹 company:", company)
-    logger.debug("🔹 phone:", phone)
-
-    const dealUrl = `${bitrixUrl}/crm/deal/details/${tid}/`
-
-    logger.debug("📌 Исходный тариф перед обработкой:", tarif)
-    const tarifText = cleanOmniNotes(extractTarifText(tarif))
-    logger.debug("📌 Обработанный тариф:", tarifText)
-
-    // 🔍 **Поиск существующих пользователей**
-    logger.info("🔍 Получение данных пользователя по телефону и email...")
+    //Поиск пользователей
     let existingUsers = []
+    existingUsers = existingUsers.filter((usr) => usr && usr.user_id)
 
     try {
-      existingUsers = await getUser({ user_phone: phone, user_email: contmail })
-      existingUsers = existingUsers.filter((user) => user && user.user_id)
-      logger.debug("📌 Все пользователи, найденные в OmniDesk:", existingUsers)
+      existingUsers = await getUser({
+        user_phone: data.phone
+        /* user_email: data.contmail */
+      })
     } catch (error) {
-      logger.error(
-        "❌ Ошибка при получении данных пользователя:",
-        error.message
-      )
+      console.error("Ошибка при поиске пользователя:", error)
+      throw new Error(`Ошибка на сервере: ${error.message}`)
     }
 
-    // ✅ **Удаление старых пользователей**
+    let mainUser = null
     if (existingUsers.length > 0) {
-      for (const user of existingUsers) {
-        logger.warn(
-          `⚠️ Удаляем старого пользователя ID=${user.user_id} со всеми кейсами`
-        )
-        await deleteAllCases(user.user_id)
-        await deleteSingleUser(user.user_id)
-      }
-      // ⏳ Ожидание перед повторной проверкой
-      await new Promise((r) => setTimeout(r, 2000))
-    }
+      mainUser = existingUsers[0]
+      const duplicates = existingUsers.slice(1)
 
-    // 🔄 **Повторная проверка, удалился ли пользователь**
-    let existingUsersAfterDelete = await getUser({
-      user_phone: phone,
-      user_email: contmail
-    })
-
-    logger.debug(
-      "📌 Проверка пользователей после удаления:",
-      existingUsersAfterDelete
-    )
-
-    if (existingUsersAfterDelete.length > 0) {
-      logger.warn(
-        "⚠️ Повторное удаление пользователей, так как OmniDesk их не очистил"
-      )
-      for (const user of existingUsersAfterDelete) {
-        await deleteAllCases(user.user_id)
-        await deleteSingleUser(user.user_id)
-      }
-      await new Promise((r) => setTimeout(r, 2000))
-    }
-
-    // 📲 **Логика отправки WhatsApp**
-    let waStatus = "не отправлена ❌"
-    if (!isTestMode) {
-      logger.info("🚀 Запускаем отправку WhatsApp...")
-      try {
-        waStatus = await sendWa(phone)
-        logger.info("📌 Статус WhatsApp уведомления:", waStatus)
-      } catch (error) {
-        logger.error("❌ Ошибка при отправке WhatsApp:", error.message)
-      }
-    } else {
-      logger.info("🛑 Тестовый режим, WhatsApp НЕ отправляется")
-    }
-
-    // 📝 **Создаём новую заявку**
-    const caseData = {
-      case: {
-        user_email: email,
-        status: "open",
-        content_type: "html",
-        user_full_name: `${surname} ${firstName}`,
-        subject: `Регистрация. ${company} - ${Date.now()}`,
-        content: `Организация: ${company}
-Контакт: ${phone} ${contname}
-Категория: ${cat} ${role}
-Тариф: ${tarifText}
-Инструкция: ${waStatus}
-Ссылка на заявку: ${dealUrl}
-${gs1 === "Да" ? "🌐 Регистрация в ГС1!" : ""}
-${comment ? "❗ Комментарий: " + comment : ""}`
+      if (duplicates.length > 0) {
+        for await (const dup of duplicates) {
+          if (!dup?.user_id) {
+            console.warn("Пропускаем дубликат без user_id:", dup)
+            continue
+          }
+          try {
+            console.log(`Удаляем дубликат: user_id=${dup.user_id}`)
+            await unlinkAllLinkedUsers(dup.user_id)
+          } catch (err) {
+            console.error("Ошибка удаления дубликата:", err.message)
+          }
+        }
       }
     }
-
-    logger.debug(
-      "📩 Отправляем заявку в OmniDesk:",
-      JSON.stringify(caseData, null, 2)
-    )
-    try {
-      const { status, data } = await postCase(caseData)
-      logger.info(`✅ Заявка успешно отправлена в OmniDesk. Статус: ${status}`)
-      logger.debug("📌 Ответ OmniDesk:", JSON.stringify(data, null, 2))
-    } catch (error) {
-      logger.error("❌ Ошибка при отправке заявки в OmniDesk:", error.message)
-    }
-
-    // 🆕 **Создание нового пользователя**
-    logger.info("🆕 Создаем новый профиль пользователя...")
-
-    // **Изменение email, если OmniDesk не удалил старый профиль**
-    const newEmail =
-      existingUsersAfterDelete.length > 0
-        ? `temp_${Date.now()}@mail.com`
-        : contmail
 
     const userData = {
       user: {
-        user_full_name: contname,
-        company_name: company,
-        company_position: inn,
-        user_phone: phone,
-        user_email: newEmail,
-        user_telegram: tg.replace("@", ""),
-        user_note: tarifText
+        user_full_name: data.contname,
+        company_name: data.company,
+        company_position: data.inn,
+        user_phone: data.phone,
+        /* user_email: data.contmail, */
+        user_telegram: data.tg.replace("@", ""),
+        user_note: data.cleanNotes
       }
     }
-
-    logger.debug(
-      "📌 Данные перед созданием пользователя:",
-      JSON.stringify(userData, null, 2)
-    )
 
     try {
-      const createdUser = await createUser(userData)
-      if (!createdUser || !createdUser.user_id) {
-        throw new Error(
-          "OmniDesk не вернул корректного ответа о создании пользователя"
+      if (!mainUser) {
+        console.log("Пользователь не найден, создаём нового...")
+        mainUser = await createUser(userData)
+        console.log("Новый пользователь создан:", mainUser.user_id)
+      } else {
+        console.log(
+          `Обновляем «главного» пользователя ID=${mainUser.user_id}...`
+        )
+        mainUser = await editUser(mainUser.user_id, userData)
+        console.log("Пользователь обновлён:", mainUser.user_id)
+      }
+    } catch (err) {
+      if (err.message.includes("email_already_exists")) {
+        console.error(
+          "Ошибка: этот email уже привязан к другому пользователю. Ищем существующего..."
+        )
+
+        let existingEmailUser = []
+        try {
+          existingEmailUser = await getUser({ user_email: data.contmail })
+        } catch (findError) {
+          console.error(
+            "Не удалось найти пользователя по email:",
+            findError.message
+          )
+        }
+
+        if (existingEmailUser.length) {
+          console.log(
+            "Найден существующий пользователь:",
+            existingEmailUser[0].user_id
+          )
+          mainUser = existingEmailUser[0]
+        } else {
+          console.warn(
+            "Пользователь с таким email не найден. Возможно, ошибка в API."
+          )
+        }
+      } else {
+        console.error(
+          "Ошибка при создании/обновлении пользователя:",
+          err.message
         )
       }
-      logger.info(`✅ Новый профиль успешно создан: ID ${createdUser.user_id}`)
-      res.sendStatus(200)
-    } catch (error) {
-      logger.error("❌ Ошибка при создании пользователя:", error.message)
-      res.status(500).send("❌ Ошибка при создании нового пользователя")
     }
+
+    let waStatus = "Не отправляется"
+    if (!isTestMode) {
+      console.info("Начинаем отправку в WhatsApp...")
+      try {
+        waStatus = await sendWa(data.phone)
+      } catch (error) {
+        console.error("Ошибка при отправке WhatsApp:", error.message)
+      }
+    }
+
+    const caseData = {
+      case: {
+        user_email: data.email,
+        status: "open",
+        content_type: "html",
+        user_full_name: `${data.surname} ${data.firstName}`,
+        subject: `Регистрация. ${data.company} - ${Date.now()}`,
+        content: `Организация: ${data.company}
+Контакт: ${data.phone} ${data.contname}
+Категория: ${data.cat} ${data.role}
+Тариф: ${data.cleanTarif}
+Инструкция: ${waStatus}
+Ссылка на заявку: ${data.dealUrl}
+${data.gs1 === "Да" ? "🌐 Регистрация в ГС1!" : ""}
+${data.comment ? "❗ Комментарий: " + data.comment : ""}`
+      }
+    }
+
+    console.log("Создаём заявку...", JSON.stringify(caseData, null, 2))
+    try {
+      const newCase = await createCase(caseData)
+      console.log("Заявка успешно создана:", newCase)
+    } catch (err) {
+      console.error("Ошибка при создании заявки:", err.message)
+    }
+
+    res.sendStatus(200)
   } catch (error) {
-    logger.error("❌ Ошибка при обработке регистрации:", error.message)
-    res.status(500).send("❌ Внутренняя ошибка сервера")
+    if (
+      error.message.startsWith("Некорректный телефон") ||
+      error.message.startsWith("Некорректный e-mail") ||
+      error.message.startsWith("Неверное число элементов") ||
+      error.message.includes("Пустое тело запроса")
+    ) {
+      console.error("Ошибка валидации:", error.message)
+      return res.status(400).json({ error: error.message })
+    }
+    console.error("Ошибка:", error.message)
+    return res.status(500).json({
+      error: "Ошибка на сервере",
+      details: error.message
+    })
   }
 }
