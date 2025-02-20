@@ -10,8 +10,7 @@ export async function processUser(data) {
   let existingUsers = []
   try {
     existingUsers = await getUser({
-      user_phone: data.phone,
-      user_email: data.contmail
+      user_phone: data.phone
     })
   } catch (error) {
     console.error("Ошибка при поиске пользователя:", error)
@@ -42,7 +41,6 @@ export async function processUser(data) {
       company_name: data.company,
       company_position: data.inn,
       user_phone: data.phone,
-      user_email: data.contmail,
       user_telegram: data.tg.replace("@", ""),
       user_note: data.cleanNotes
     }
