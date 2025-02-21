@@ -212,15 +212,16 @@ export const unlinkAllLinkedUsers = async (userId) => {
     for await (const linkedUserId of user.linked_users) {
       console.log(`Отправка PUT-запроса для отвязки user_id=${linkedUserId}`)
 
-      const unlinkFn = async () => {
-        return await unlinkUser(userId, linkedUserId)
-      }
+      // Сформируем URL и body
+      const unlinkUrl = `${omnideskUrl}/api/users/${userId}/unlink.json`
+      const body = { user_id: linkedUserId }
+      const config = { headers, auth }
 
-      const unlinkResponse = await unlinkWithRetry(unlinkFn)
-
+      // Вызываем unlinkWithRetry по старой схеме
+      const unlinkResponse = await unlinkWithRetry(unlinkUrl, body, config)
       console.log(
         `Пользователь ${linkedUserId} успешно отвязан от ${userId}.`,
-        unlinkResponse
+        unlinkResponse.data
       )
     }
 
