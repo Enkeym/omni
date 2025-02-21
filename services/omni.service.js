@@ -4,29 +4,20 @@ import axios from "axios"
 import { omnideskApiKey, omnideskEmail, omnideskUrl } from "../config.js"
 import { unlinkWithRetry } from "../utils/unlinkWithRetry.js"
 
+// Общие заголовки и auth для всех запросов
 const headers = { "Content-Type": "application/json" }
 const auth = {
   username: omnideskEmail,
   password: omnideskApiKey
 }
 
-export const getUser = async (params) => {
-  const url = `${omnideskUrl}/api/users.json`
-  const response = await axios.get(url, { headers, auth, params })
-  return Object.values(response.data).map((objUser) => objUser.user)
-}
+// ------------------------- CASES -------------------------
 
-export const getUserById = async (userId) => {
-  const url = `${omnideskUrl}/api/users/${userId}.json`
-  const response = await axios.get(url, { headers, auth })
-  return response.data.user
-}
-
+// Создать заявку (case)
 export const createCase = async (caseData) => {
   if (!caseData) {
     throw new Error("Некорректные данные:", caseData)
   }
-
   try {
     const url = `${omnideskUrl}/api/cases.json`
     const response = await axios.post(url, caseData, { headers, auth })
@@ -41,14 +32,103 @@ export const createCase = async (caseData) => {
   }
 }
 
+// Получить список заявок (cases), с возможностью пробросить query-параметры (например, page)
+export const getCases = async (params = {}) => {
+  try {
+    const url = `${omnideskUrl}/api/cases.json`
+    const response = await axios.get(url, {
+      headers,
+      auth,
+      params
+    })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при получении списка заявок:", error.message)
+    throw error
+  }
+}
+
+// Получить заявку (case) по ID
+export const getCaseById = async (caseId) => {
+  try {
+    const url = `${omnideskUrl}/api/cases/${caseId}.json`
+    const response = await axios.get(url, { headers, auth })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при получении заявки по ID:", error.message)
+    throw error
+  }
+}
+
+// Удалить заявку (case) по ID
+export const deleteCase = async (caseId) => {
+  try {
+    const url = `${omnideskUrl}/api/cases/${caseId}.json`
+    const response = await axios.delete(url, { headers, auth })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при удалении заявки:", error.message)
+    throw error
+  }
+}
+
+// Изменить заявку (case) по ID
+export const editCase = async (caseId, caseData) => {
+  try {
+    const url = `${omnideskUrl}/api/cases/${caseId}.json`
+    const response = await axios.put(url, caseData, { headers, auth })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при редактировании заявки:", error.message)
+    throw error
+  }
+}
+
+// ------------------------- USERS -------------------------
+
+// Получить список пользователей, фильтруя по телефону и/или email
+// Omnidesk ищет по query-параметрам user_phone, user_email
+export const getUser = async (params = {}) => {
+  const { user_phone, user_email } = params
+  try {
+    const url = `${omnideskUrl}/api/users.json`
+    const response = await axios.get(url, {
+      headers,
+      auth,
+      params: {
+        ...(user_phone ? { user_phone } : {}),
+        ...(user_email ? { user_email } : {})
+      }
+    })
+
+    return Object.values(response.data).map((obj) => obj.user)
+  } catch (error) {
+    console.error("Ошибка при получении пользователя:", error.message)
+    throw error
+  }
+}
+
+// Получить пользователя по ID
+export const getUserById = async (userId) => {
+  try {
+    const url = `${omnideskUrl}/api/users/${userId}.json`
+    const response = await axios.get(url, { headers, auth })
+    return response.data.user
+  } catch (error) {
+    console.error("Ошибка при получении пользователя по ID:", error.message)
+    throw error
+  }
+}
+
+// Создать пользователя
 export const createUser = async (userData) => {
   if (!userData) {
     throw new Error("Некорректные данные:", userData)
   }
-
   try {
     const url = `${omnideskUrl}/api/users.json`
     const response = await axios.post(url, userData, { headers, auth })
+    // Ожидаем, что будет { user: { ... } }
     return response.data.user
   } catch (error) {
     console.log("Ошибка при создании пользователя:", error.message)
@@ -60,15 +140,14 @@ export const createUser = async (userData) => {
   }
 }
 
+// Изменить пользователя (PUT /users/:id)
 export const editUser = async (userId, userData) => {
   if (!userId) {
     throw new Error("Не передан userId для редактирования")
   }
-
   if (!userData) {
     throw new Error("Нет данных для редактирования пользователя")
   }
-
   try {
     const url = `${omnideskUrl}/api/users/${userId}.json`
     const response = await axios.put(url, userData, { headers, auth })
@@ -83,16 +162,39 @@ export const editUser = async (userId, userData) => {
   }
 }
 
+// Удалить пользователя
+export const deleteUser = async (userId) => {
+  try {
+    const url = `${omnideskUrl}/api/users/${userId}.json`
+    const response = await axios.delete(url, { headers, auth })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при удалении пользователя:", error.message)
+    throw error
+  }
+}
+
+// Отвязать один userId от другого (PUT /users/:mainId/unlink.json)
+export const unlinkUser = async (mainUserId, linkedUserId) => {
+  const url = `${omnideskUrl}/api/users/${mainUserId}/unlink.json`
+  const body = { user_id: linkedUserId }
+  try {
+    const response = await axios.put(url, body, { headers, auth })
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при отвязке пользователя:", error.message)
+    throw error
+  }
+}
+
+// Отвязка всех связанных пользователей
 export const unlinkAllLinkedUsers = async (userId) => {
   if (!userId) {
     throw new Error("Не передан userId для отвязки связанных пользователей")
   }
 
   try {
-    const getUrl = `${omnideskUrl}/api/users/${userId}.json`
-    const getResponse = await axios.get(getUrl, { headers, auth })
-    const user = getResponse.data.user
-
+    const user = await getUserById(userId)
     if (!user) {
       console.warn(`Пользователь с ID ${userId} не найден`)
       return
@@ -108,16 +210,17 @@ export const unlinkAllLinkedUsers = async (userId) => {
     )
 
     for await (const linkedUserId of user.linked_users) {
-      const unlinkUrl = `${omnideskUrl}/api/users/${userId}/unlink.json`
-      const body = { user_id: linkedUserId }
       console.log(`Отправка PUT-запроса для отвязки user_id=${linkedUserId}`)
-      const unlinkResponse = await unlinkWithRetry(unlinkUrl, body, {
-        headers,
-        auth
-      })
+
+      const unlinkFn = async () => {
+        return await unlinkUser(userId, linkedUserId)
+      }
+
+      const unlinkResponse = await unlinkWithRetry(unlinkFn)
+
       console.log(
         `Пользователь ${linkedUserId} успешно отвязан от ${userId}.`,
-        unlinkResponse.data
+        unlinkResponse
       )
     }
 
