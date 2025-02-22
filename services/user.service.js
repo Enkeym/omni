@@ -120,6 +120,35 @@ export async function processUser(data) {
               "Снова возникла ошибка при втором обновлении 'главного' пользователя (phone):",
               secondUpdateErr.message
             )
+
+            try {
+              console.log(
+                "Принудительно очищаем поля 'главного' пользователя, которые могут конфликтовать с телефоном..."
+              )
+              await editUser(phoneMainUser.user_id, {
+                user: {
+                  user_phone: "",
+                  user_screen_name: "",
+                  wa_id: "",
+                  type: ""
+                }
+              })
+
+              console.log(
+                "Поля очищены. Пробуем снова прописать нужный user_phone..."
+              )
+              phoneMainUser = await editUser(phoneMainUser.user_id, userData)
+              console.log(
+                "Повторное обновление 'главного' пользователя (phone) после очистки завершено:",
+                phoneMainUser.user_id
+              )
+              mainUser = phoneMainUser
+            } catch (forcedClearErr) {
+              console.error(
+                "Ошибка при принудительной очистке 'главного' пользователя (phone):",
+                forcedClearErr.message
+              )
+            }
           }
         } else if (existingPhoneUsers.length === 1) {
           let phoneMainUser = existingPhoneUsers[0]
@@ -135,6 +164,30 @@ export async function processUser(data) {
               "Ошибка при втором обновлении единственного пользователя (phone):",
               secondUpdateErr.message
             )
+
+            try {
+              console.log("Принудительно очищаем 'главного' (phoneMainUser)...")
+              await editUser(phoneMainUser.user_id, {
+                user: {
+                  user_phone: "",
+                  user_screen_name: "",
+                  wa_id: "",
+                  type: ""
+                }
+              })
+
+              phoneMainUser = await editUser(phoneMainUser.user_id, userData)
+              console.log(
+                "Обновление завершено (phone) после очистки:",
+                phoneMainUser.user_id
+              )
+              mainUser = phoneMainUser
+            } catch (forcedClearErr) {
+              console.error(
+                "Ошибка при принудительной очистке единственного пользователя (phone):",
+                forcedClearErr.message
+              )
+            }
           }
         } else {
           console.warn(
