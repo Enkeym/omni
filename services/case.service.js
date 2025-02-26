@@ -8,7 +8,7 @@ export async function processCase(
 ) {
   const caseData = {
     case: {
-      user_email: data.email,
+      user_email: data.contmail,
       status: "open",
       content_type: "html",
       user_full_name: `${data.surname} ${data.firstName}`,

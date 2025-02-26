@@ -83,6 +83,25 @@ export const editUser = async (userId, userData) => {
   }
 }
 
+export const deleteUser = async (userId) => {
+  if (!userId) {
+    throw new Error("Не передан userId для удаления")
+  }
+  try {
+    const url = `${omnideskUrl}/api/users/${userId}.json`
+    const response = await axios.delete(url, { headers, auth })
+    console.log(`Пользователь ${userId} успешно удалён.`)
+    return response.data
+  } catch (error) {
+    console.error("Ошибка при удалении пользователя:", error.message)
+    throw new Error(
+      `Ошибка при удалении пользователя: ${
+        error.response?.data?.error || error.message
+      }`
+    )
+  }
+}
+
 export const deleteAllLinkedUsers = async (userId) => {
   if (!userId) {
     throw new Error("Не передан userId для удаления связанных пользователей")

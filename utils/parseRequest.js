@@ -14,7 +14,7 @@ function isValidPhone(phone) {
 export const parseRequest = (path) => {
   let data = decodeURIComponent(path)
   data = data
-    .replace(/^\/?([-a-z]+-?(users|test|register|payment))\|?/, "")
+    .replace(/^[-\/]?(register-test|register|payment|test-users|users)\|?/, "")
     .replace(/^\|/, "")
 
   console.log("data:", JSON.stringify(data, 2, null))
