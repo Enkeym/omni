@@ -1,46 +1,52 @@
-import {
-  createUser,
-  editUser,
-  getUser,
-  unlinkAllLinkedUsers
-} from "./omni.service.js"
+import { getUsersByMultipleFields } from "../utils/getUsersByMultipleFields.js"
+
+import { createUser, deleteAllLinkedUsers, editUser } from "./omni.service.js"
 
 export async function processUser(data) {
-  // Поиск пользователя
+  // Изначальный поиск пользователя по нескольким полям
   let existingUsers = []
   try {
-    existingUsers = await getUser({
-      user_phone: data.phone
-    })
+    existingUsers = await getUsersByMultipleFields(data)
   } catch (error) {
     console.error("Ошибка при поиске пользователя:", error)
     throw new Error(`Ошибка на сервере: ${error.message}`)
   }
 
+  // Фильтруем – оставляем только пользователей с user_id
   existingUsers = existingUsers.filter((usr) => usr && usr.user_id)
-  let mainUser = existingUsers.length > 0 ? existingUsers[0] : null
 
-  // Удаление дубликатов
-  if (existingUsers.length > 1) {
+  // Пока найдено больше одного пользователя, обрабатываем дубликаты
+  while (existingUsers.length > 1) {
+    // Получаем список дубликатов (все, кроме первого)
     const duplicates = existingUsers.slice(1)
     for await (const dup of duplicates) {
       if (!dup?.user_id) continue
       try {
         console.log(`Удаляем дубликат: user_id=${dup.user_id}`)
-        await unlinkAllLinkedUsers(dup.user_id)
+        await deleteAllLinkedUsers(dup.user_id)
         console.log(`Очищаем номер телефона у дубликата ID=${dup.user_id}`)
         await editUser(dup.user_id, {
-          user: {
-            user_phone: ""
-          }
+          user: { user_phone: "" }
         })
       } catch (err) {
         console.error("Ошибка удаления дубликата:", err.message)
       }
     }
+
+    // После обработки дубликатов повторно запрашиваем пользователей
+    try {
+      existingUsers = await getUsersByMultipleFields(data)
+    } catch (error) {
+      console.error("Ошибка при повторном поиске пользователя:", error.message)
+      throw new Error(`Ошибка на сервере: ${error.message}`)
+    }
+    existingUsers = existingUsers.filter((usr) => usr && usr.user_id)
   }
 
-  // Данные для создания/обновления пользователя
+  // Если остался ровно один пользователь, считаем его основным
+  const mainUser = existingUsers.length === 1 ? existingUsers[0] : null
+
+  // Подготовка данных для создания/обновления пользователя
   const userData = {
     user: {
       user_full_name: data.contname,
@@ -52,95 +58,23 @@ export async function processUser(data) {
     }
   }
 
-  // Создание или обновление
+  // Если найден пользователь — обновляем, иначе создаём нового
+  let resultUser = null
   try {
     if (!mainUser) {
       console.log("Пользователь не найден, создаём нового...")
-      mainUser = await createUser(userData)
-      console.log("Новый пользователь создан:", mainUser.user_id)
+      resultUser = await createUser(userData)
+      console.log("Новый пользователь создан:", resultUser.user_id)
     } else {
       console.log(`Обновляем пользователя ID=${mainUser.user_id}...`)
-      mainUser = await editUser(mainUser.user_id, userData)
-      console.log("Пользователь обновлён:", mainUser.user_id)
+      resultUser = await editUser(mainUser.user_id, userData)
+      console.log("Пользователь обновлён:", resultUser.user_id)
     }
   } catch (err) {
-    if (err.message.includes("phone_already_exists")) {
-      console.error("Ошибка: телефон уже привязан к другому пользователю.")
-
-      let existingPhoneUsers = []
-      try {
-        existingPhoneUsers = await getUser({ user_phone: data.phone })
-        existingPhoneUsers = existingPhoneUsers.filter(
-          (usr) => usr && usr.user_id
-        )
-
-        if (existingPhoneUsers.length > 1) {
-          console.log(
-            "Повторное обнаружение дубликатов по телефону:",
-            existingPhoneUsers.map((u) => u.user_id)
-          )
-
-          let phoneMainUser = existingPhoneUsers[0]
-          const phoneDuplicates = existingPhoneUsers.slice(1)
-
-          for await (const dup of phoneDuplicates) {
-            if (!dup?.user_id) continue
-            try {
-              console.log(`Отвязываем/очищаем дубликат user_id=${dup.user_id}`)
-              await unlinkAllLinkedUsers(dup.user_id)
-              await editUser(dup.user_id, { user: { user_phone: "" } })
-            } catch (dupErr) {
-              console.error(
-                "Ошибка при очистке повторного дубликата:",
-                dupErr.message
-              )
-            }
-          }
-
-          try {
-            phoneMainUser = await editUser(phoneMainUser.user_id, userData)
-            console.log(
-              "Повторное обновление «главного» пользователя завершено:",
-              phoneMainUser.user_id
-            )
-            mainUser = phoneMainUser
-          } catch (secondUpdateErr) {
-            console.error(
-              "Снова возникла ошибка при втором обновлении 'главного' пользователя:",
-              secondUpdateErr.message
-            )
-          }
-        } else if (existingPhoneUsers.length === 1) {
-          let phoneMainUser = existingPhoneUsers[0]
-          try {
-            console.log(
-              `Пробуем ещё раз обновить пользователя ID=${phoneMainUser.user_id}...`
-            )
-            phoneMainUser = await editUser(phoneMainUser.user_id, userData)
-            console.log("Обновление завершено:", phoneMainUser.user_id)
-            mainUser = phoneMainUser
-          } catch (secondUpdateErr) {
-            console.error(
-              "Ошибка при втором обновлении единственного пользователя:",
-              secondUpdateErr.message
-            )
-          }
-        } else {
-          console.warn(
-            "Пользователь с таким номером телефона не найден при повторном поиске."
-          )
-        }
-      } catch (findPhoneErr) {
-        console.error(
-          "Ошибка при повторном поиске пользователя по телефону:",
-          findPhoneErr.message
-        )
-      }
-    } else if (err.message.includes("email_already_exists")) {
-      console.error("Ошибка: email уже привязан к другому пользователю.")
-    } else {
-      console.error("Ошибка при создании/обновлении пользователя:", err.message)
-    }
+    // Здесь можно добавить дополнительную обработку ошибок (например, для phone_already_exists)
+    console.error("Ошибка при создании/обновлении пользователя:", err.message)
+    throw err
   }
-  return mainUser
+
+  return resultUser
 }

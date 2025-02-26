@@ -2,7 +2,7 @@
 import axios from "axios"
 
 import { omnideskApiKey, omnideskEmail, omnideskUrl } from "../config.js"
-import { unlinkWithRetry } from "../utils/unlinkWithRetry.js"
+import { tryWithRetry } from "../utils/tryWithRetry.js"
 
 const headers = { "Content-Type": "application/json" }
 const auth = {
@@ -83,9 +83,9 @@ export const editUser = async (userId, userData) => {
   }
 }
 
-export const unlinkAllLinkedUsers = async (userId) => {
+export const deleteAllLinkedUsers = async (userId) => {
   if (!userId) {
-    throw new Error("Не передан userId для отвязки связанных пользователей")
+    throw new Error("Не передан userId для удаления связанных пользователей")
   }
 
   try {
@@ -104,29 +104,27 @@ export const unlinkAllLinkedUsers = async (userId) => {
     }
 
     console.log(
-      `Найдено ${user.linked_users.length} связанных пользователей. Начинаем отвязку...`
+      `Найдено ${user.linked_users.length} связанных пользователей. Начинаем полное удаление...`
     )
 
     for await (const linkedUserId of user.linked_users) {
-      const unlinkUrl = `${omnideskUrl}/api/users/${userId}/unlink.json`
-      const body = { user_id: linkedUserId }
-      console.log(`Отправка PUT-запроса для отвязки user_id=${linkedUserId}`)
-      const unlinkResponse = await unlinkWithRetry(unlinkUrl, body, {
-        headers,
-        auth
-      })
+      const deleteUrl = `${omnideskUrl}/api/users/${linkedUserId}.json`
       console.log(
-        `Пользователь ${linkedUserId} успешно отвязан от ${userId}.`,
-        unlinkResponse.data
+        `Отправка DELETE-запроса для удаления user_id=${linkedUserId}`
+      )
+      const deleteResponse = await tryWithRetry(deleteUrl, { headers, auth })
+      console.log(
+        `Пользователь ${linkedUserId} успешно удалён.`,
+        deleteResponse.data
       )
     }
 
     console.log(
-      `Все связанные пользователи (${user.linked_users.length} шт.) отвязаны от ${userId}.`
+      `Все связанные пользователи (${user.linked_users.length} шт.) удалены.`
     )
   } catch (error) {
     console.error(
-      `Ошибка при отвязке пользователей от ${userId}:`,
+      `Ошибка при удалении связанных пользователей от ${userId}:`,
       error.response?.data || error.message
     )
     throw error
