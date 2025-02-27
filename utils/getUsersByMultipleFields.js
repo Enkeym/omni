@@ -6,7 +6,6 @@ export const getUsersByMultipleFields = async (data) => {
   try {
     const searchFields = [
       { key: "user_phone", value: data.phone },
-      { key: "user_email", value: data.email },
       { key: "user_email", value: data.contmail }
     ]
 
