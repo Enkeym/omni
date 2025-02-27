@@ -2,7 +2,6 @@ import { parseRequest } from "../utils/parseRequest.js"
 import { sendWa } from "../utils/sendWa.js"
 
 import { processCase } from "./case.service.js"
-import { processUser } from "./user.service.js"
 
 export async function processFlow(req, res, options = {}) {
   const {
@@ -18,8 +17,8 @@ export async function processFlow(req, res, options = {}) {
     console.log("Обработанные данные:", data)
 
     // Обработка пользователя: поиск, удаление дубликатов, создание/обновление
-    const mainUser = await processUser(data)
-    console.log("Полученный пользователь:", mainUser)
+    /*   const mainUser = await processUser(data)
+    console.log("Полученный пользователь:", mainUser) */
 
     let waStatus = "Не отправляется"
     if (sendWhatsApp && !isTestMode) {
