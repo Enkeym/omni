@@ -1,12 +1,17 @@
-import { getUsersByMultipleFields } from "../utils/getUsersByMultipleFields.js"
-
-import { createUser, deleteAllLinkedUsers, deleteUser } from "./omni.service.js"
+import {
+  createUser,
+  deleteAllLinkedUsers,
+  deleteUser,
+  getUser
+} from "./omni.service.js"
 
 export async function processUser(data) {
   // Поиск пользователя по нескольким полям
   let existingUsers = []
   try {
-    existingUsers = await getUsersByMultipleFields(data)
+    existingUsers = await getUser({
+      user_phone: data.phone
+    })
   } catch (error) {
     console.error("Ошибка при поиске пользователя:", error)
     throw new Error(`Ошибка на сервере: ${error.message}`)
@@ -39,7 +44,6 @@ export async function processUser(data) {
       company_name: data.company,
       company_position: data.inn,
       user_phone: data.phone,
-      user_email: data.contmail,
       user_telegram: data.tg.replace("@", ""),
       user_note: data.cleanNotes
     }

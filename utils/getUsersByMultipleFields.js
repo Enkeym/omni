@@ -4,10 +4,7 @@ export const getUsersByMultipleFields = async (data) => {
   let users = new Map()
 
   try {
-    const searchFields = [
-      { key: "user_phone", value: data.phone },
-      { key: "user_email", value: data.contmail }
-    ]
+    const searchFields = [{ key: "user_phone", value: data.phone }]
 
     for (const { key, value } of searchFields) {
       if (value) {
